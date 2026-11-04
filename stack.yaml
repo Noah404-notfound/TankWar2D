@@ -1,0 +1,10 @@
+resolver: lts-21.25  # GHC 9.4.8
+
+packages:
+  - .
+
+extra-deps: []
+
+# Tối ưu biên dịch đa lõi
+ghc-options:
+  "$locals": -j4

@@ -1,0 +1,2707 @@
+{
+  "map": "ruins",
+  "width": 4096,
+  "height": 4096,
+  "origin": "top-left; x right, y down",
+  "cell_size": 352,
+  "tank_reference_size": 256,
+  "tank_render_scale": 1.0,
+  "reference_collision_circle_radius": 128,
+  "wall_thickness": 88,
+  "clear_corridor": 264,
+  "corridor_mode": "single tank; use passing bays",
+  "passing_bays_cells": [
+    [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    [
+      [
+        9,
+        9
+      ],
+      [
+        9,
+        10
+      ],
+      [
+        10,
+        9
+      ],
+      [
+        10,
+        10
+      ]
+    ],
+    [
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        3
+      ],
+      [
+        4,
+        4
+      ]
+    ],
+    [
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        7
+      ],
+      [
+        7,
+        6
+      ],
+      [
+        7,
+        7
+      ]
+    ]
+  ],
+  "grid_offset": 112,
+  "decorative_objects": [
+    {
+      "asset": "prop_11.png",
+      "center": [
+        357,
+        112
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_17.png",
+      "center": [
+        2067,
+        112
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_20.png",
+      "center": [
+        2742,
+        112
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_18.png",
+      "center": [
+        3186,
+        112
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_19.png",
+      "center": [
+        3411,
+        112
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_17.png",
+      "center": [
+        1383,
+        464
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_01.png",
+      "center": [
+        2401,
+        464
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_03.png",
+      "center": [
+        2725,
+        464
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_19.png",
+      "center": [
+        3026,
+        464
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_12.png",
+      "center": [
+        3404,
+        464
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_17.png",
+      "center": [
+        1077,
+        816
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_19.png",
+      "center": [
+        3090,
+        816
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_17.png",
+      "center": [
+        1970,
+        1168
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_17.png",
+      "center": [
+        2832,
+        1168
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_19.png",
+      "center": [
+        2716,
+        1520
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_14.png",
+      "center": [
+        3440,
+        1520
+      ],
+      "size": 100,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_03.png",
+      "center": [
+        3832,
+        1872
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_01.png",
+      "center": [
+        2326,
+        2224
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_11.png",
+      "center": [
+        1037,
+        2576
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_12.png",
+      "center": [
+        3447,
+        2576
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_03.png",
+      "center": [
+        1966,
+        3280
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_02.png",
+      "center": [
+        2813,
+        3632
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_12.png",
+      "center": [
+        1331,
+        3984
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_03.png",
+      "center": [
+        1701,
+        3984
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_17.png",
+      "center": [
+        3086,
+        3984
+      ],
+      "size": 55,
+      "angle": 0,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_14.png",
+      "center": [
+        112,
+        282
+      ],
+      "size": 100,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_12.png",
+      "center": [
+        112,
+        1738
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_01.png",
+      "center": [
+        112,
+        2735
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_18.png",
+      "center": [
+        112,
+        3780
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_18.png",
+      "center": [
+        464,
+        3046
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_20.png",
+      "center": [
+        464,
+        3398
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_12.png",
+      "center": [
+        816,
+        2081
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_03.png",
+      "center": [
+        1168,
+        622
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_11.png",
+      "center": [
+        1168,
+        2357
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_03.png",
+      "center": [
+        1872,
+        646
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_18.png",
+      "center": [
+        1872,
+        2369
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_01.png",
+      "center": [
+        1872,
+        3062
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_02.png",
+      "center": [
+        2576,
+        3141
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_17.png",
+      "center": [
+        2928,
+        2112
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_11.png",
+      "center": [
+        3280,
+        920
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_18.png",
+      "center": [
+        3280,
+        3190
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_14.png",
+      "center": [
+        3984,
+        1712
+      ],
+      "size": 100,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_01.png",
+      "center": [
+        3984,
+        2487
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    },
+    {
+      "asset": "prop_20.png",
+      "center": [
+        3984,
+        3131
+      ],
+      "size": 55,
+      "angle": 90,
+      "collision": "covered by supporting wall; tree canopy is visual only"
+    }
+  ],
+  "blocked_cells": [
+    [
+      1,
+      5
+    ],
+    [
+      2,
+      2
+    ],
+    [
+      2,
+      7
+    ],
+    [
+      5,
+      1
+    ],
+    [
+      5,
+      8
+    ],
+    [
+      7,
+      2
+    ],
+    [
+      8,
+      5
+    ],
+    [
+      8,
+      8
+    ]
+  ],
+  "open_connections": [
+    [
+      [
+        0,
+        0
+      ],
+      [
+        0,
+        1
+      ]
+    ],
+    [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        0
+      ]
+    ],
+    [
+      [
+        0,
+        1
+      ],
+      [
+        0,
+        2
+      ]
+    ],
+    [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    [
+      [
+        0,
+        2
+      ],
+      [
+        1,
+        2
+      ]
+    ],
+    [
+      [
+        0,
+        3
+      ],
+      [
+        0,
+        4
+      ]
+    ],
+    [
+      [
+        0,
+        4
+      ],
+      [
+        0,
+        5
+      ]
+    ],
+    [
+      [
+        0,
+        4
+      ],
+      [
+        1,
+        4
+      ]
+    ],
+    [
+      [
+        0,
+        5
+      ],
+      [
+        0,
+        6
+      ]
+    ],
+    [
+      [
+        0,
+        6
+      ],
+      [
+        0,
+        7
+      ]
+    ],
+    [
+      [
+        0,
+        7
+      ],
+      [
+        0,
+        8
+      ]
+    ],
+    [
+      [
+        0,
+        7
+      ],
+      [
+        1,
+        7
+      ]
+    ],
+    [
+      [
+        0,
+        8
+      ],
+      [
+        0,
+        9
+      ]
+    ],
+    [
+      [
+        0,
+        9
+      ],
+      [
+        0,
+        10
+      ]
+    ],
+    [
+      [
+        0,
+        10
+      ],
+      [
+        1,
+        10
+      ]
+    ],
+    [
+      [
+        1,
+        0
+      ],
+      [
+        1,
+        1
+      ]
+    ],
+    [
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ]
+    ],
+    [
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    [
+      [
+        1,
+        2
+      ],
+      [
+        1,
+        3
+      ]
+    ],
+    [
+      [
+        1,
+        3
+      ],
+      [
+        2,
+        3
+      ]
+    ],
+    [
+      [
+        1,
+        4
+      ],
+      [
+        2,
+        4
+      ]
+    ],
+    [
+      [
+        1,
+        6
+      ],
+      [
+        1,
+        7
+      ]
+    ],
+    [
+      [
+        1,
+        6
+      ],
+      [
+        2,
+        6
+      ]
+    ],
+    [
+      [
+        1,
+        8
+      ],
+      [
+        1,
+        9
+      ]
+    ],
+    [
+      [
+        1,
+        8
+      ],
+      [
+        2,
+        8
+      ]
+    ],
+    [
+      [
+        1,
+        9
+      ],
+      [
+        1,
+        10
+      ]
+    ],
+    [
+      [
+        1,
+        9
+      ],
+      [
+        2,
+        9
+      ]
+    ],
+    [
+      [
+        1,
+        10
+      ],
+      [
+        2,
+        10
+      ]
+    ],
+    [
+      [
+        2,
+        0
+      ],
+      [
+        2,
+        1
+      ]
+    ],
+    [
+      [
+        2,
+        0
+      ],
+      [
+        3,
+        0
+      ]
+    ],
+    [
+      [
+        2,
+        3
+      ],
+      [
+        3,
+        3
+      ]
+    ],
+    [
+      [
+        2,
+        4
+      ],
+      [
+        3,
+        4
+      ]
+    ],
+    [
+      [
+        2,
+        5
+      ],
+      [
+        2,
+        6
+      ]
+    ],
+    [
+      [
+        2,
+        5
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    [
+      [
+        2,
+        8
+      ],
+      [
+        3,
+        8
+      ]
+    ],
+    [
+      [
+        2,
+        9
+      ],
+      [
+        3,
+        9
+      ]
+    ],
+    [
+      [
+        2,
+        10
+      ],
+      [
+        3,
+        10
+      ]
+    ],
+    [
+      [
+        3,
+        0
+      ],
+      [
+        4,
+        0
+      ]
+    ],
+    [
+      [
+        3,
+        1
+      ],
+      [
+        3,
+        2
+      ]
+    ],
+    [
+      [
+        3,
+        1
+      ],
+      [
+        4,
+        1
+      ]
+    ],
+    [
+      [
+        3,
+        2
+      ],
+      [
+        3,
+        3
+      ]
+    ],
+    [
+      [
+        3,
+        3
+      ],
+      [
+        3,
+        4
+      ]
+    ],
+    [
+      [
+        3,
+        3
+      ],
+      [
+        4,
+        3
+      ]
+    ],
+    [
+      [
+        3,
+        4
+      ],
+      [
+        3,
+        5
+      ]
+    ],
+    [
+      [
+        3,
+        4
+      ],
+      [
+        4,
+        4
+      ]
+    ],
+    [
+      [
+        3,
+        5
+      ],
+      [
+        3,
+        6
+      ]
+    ],
+    [
+      [
+        3,
+        6
+      ],
+      [
+        3,
+        7
+      ]
+    ],
+    [
+      [
+        3,
+        6
+      ],
+      [
+        4,
+        6
+      ]
+    ],
+    [
+      [
+        3,
+        7
+      ],
+      [
+        3,
+        8
+      ]
+    ],
+    [
+      [
+        3,
+        7
+      ],
+      [
+        4,
+        7
+      ]
+    ],
+    [
+      [
+        3,
+        8
+      ],
+      [
+        3,
+        9
+      ]
+    ],
+    [
+      [
+        3,
+        9
+      ],
+      [
+        3,
+        10
+      ]
+    ],
+    [
+      [
+        3,
+        9
+      ],
+      [
+        4,
+        9
+      ]
+    ],
+    [
+      [
+        3,
+        10
+      ],
+      [
+        4,
+        10
+      ]
+    ],
+    [
+      [
+        4,
+        0
+      ],
+      [
+        5,
+        0
+      ]
+    ],
+    [
+      [
+        4,
+        1
+      ],
+      [
+        4,
+        2
+      ]
+    ],
+    [
+      [
+        4,
+        2
+      ],
+      [
+        4,
+        3
+      ]
+    ],
+    [
+      [
+        4,
+        3
+      ],
+      [
+        4,
+        4
+      ]
+    ],
+    [
+      [
+        4,
+        3
+      ],
+      [
+        5,
+        3
+      ]
+    ],
+    [
+      [
+        4,
+        4
+      ],
+      [
+        4,
+        5
+      ]
+    ],
+    [
+      [
+        4,
+        4
+      ],
+      [
+        5,
+        4
+      ]
+    ],
+    [
+      [
+        4,
+        5
+      ],
+      [
+        4,
+        6
+      ]
+    ],
+    [
+      [
+        4,
+        5
+      ],
+      [
+        5,
+        5
+      ]
+    ],
+    [
+      [
+        4,
+        6
+      ],
+      [
+        4,
+        7
+      ]
+    ],
+    [
+      [
+        4,
+        7
+      ],
+      [
+        4,
+        8
+      ]
+    ],
+    [
+      [
+        4,
+        7
+      ],
+      [
+        5,
+        7
+      ]
+    ],
+    [
+      [
+        4,
+        9
+      ],
+      [
+        4,
+        10
+      ]
+    ],
+    [
+      [
+        4,
+        9
+      ],
+      [
+        5,
+        9
+      ]
+    ],
+    [
+      [
+        5,
+        0
+      ],
+      [
+        6,
+        0
+      ]
+    ],
+    [
+      [
+        5,
+        2
+      ],
+      [
+        6,
+        2
+      ]
+    ],
+    [
+      [
+        5,
+        3
+      ],
+      [
+        5,
+        4
+      ]
+    ],
+    [
+      [
+        5,
+        4
+      ],
+      [
+        5,
+        5
+      ]
+    ],
+    [
+      [
+        5,
+        4
+      ],
+      [
+        6,
+        4
+      ]
+    ],
+    [
+      [
+        5,
+        5
+      ],
+      [
+        5,
+        6
+      ]
+    ],
+    [
+      [
+        5,
+        5
+      ],
+      [
+        6,
+        5
+      ]
+    ],
+    [
+      [
+        5,
+        6
+      ],
+      [
+        6,
+        6
+      ]
+    ],
+    [
+      [
+        5,
+        7
+      ],
+      [
+        6,
+        7
+      ]
+    ],
+    [
+      [
+        5,
+        9
+      ],
+      [
+        5,
+        10
+      ]
+    ],
+    [
+      [
+        5,
+        10
+      ],
+      [
+        6,
+        10
+      ]
+    ],
+    [
+      [
+        6,
+        0
+      ],
+      [
+        7,
+        0
+      ]
+    ],
+    [
+      [
+        6,
+        1
+      ],
+      [
+        6,
+        2
+      ]
+    ],
+    [
+      [
+        6,
+        1
+      ],
+      [
+        7,
+        1
+      ]
+    ],
+    [
+      [
+        6,
+        2
+      ],
+      [
+        6,
+        3
+      ]
+    ],
+    [
+      [
+        6,
+        3
+      ],
+      [
+        6,
+        4
+      ]
+    ],
+    [
+      [
+        6,
+        4
+      ],
+      [
+        7,
+        4
+      ]
+    ],
+    [
+      [
+        6,
+        5
+      ],
+      [
+        7,
+        5
+      ]
+    ],
+    [
+      [
+        6,
+        6
+      ],
+      [
+        6,
+        7
+      ]
+    ],
+    [
+      [
+        6,
+        6
+      ],
+      [
+        7,
+        6
+      ]
+    ],
+    [
+      [
+        6,
+        7
+      ],
+      [
+        7,
+        7
+      ]
+    ],
+    [
+      [
+        6,
+        8
+      ],
+      [
+        6,
+        9
+      ]
+    ],
+    [
+      [
+        6,
+        9
+      ],
+      [
+        7,
+        9
+      ]
+    ],
+    [
+      [
+        6,
+        10
+      ],
+      [
+        7,
+        10
+      ]
+    ],
+    [
+      [
+        7,
+        0
+      ],
+      [
+        8,
+        0
+      ]
+    ],
+    [
+      [
+        7,
+        1
+      ],
+      [
+        8,
+        1
+      ]
+    ],
+    [
+      [
+        7,
+        3
+      ],
+      [
+        8,
+        3
+      ]
+    ],
+    [
+      [
+        7,
+        4
+      ],
+      [
+        7,
+        5
+      ]
+    ],
+    [
+      [
+        7,
+        4
+      ],
+      [
+        8,
+        4
+      ]
+    ],
+    [
+      [
+        7,
+        5
+      ],
+      [
+        7,
+        6
+      ]
+    ],
+    [
+      [
+        7,
+        6
+      ],
+      [
+        7,
+        7
+      ]
+    ],
+    [
+      [
+        7,
+        7
+      ],
+      [
+        7,
+        8
+      ]
+    ],
+    [
+      [
+        7,
+        8
+      ],
+      [
+        7,
+        9
+      ]
+    ],
+    [
+      [
+        7,
+        10
+      ],
+      [
+        8,
+        10
+      ]
+    ],
+    [
+      [
+        8,
+        0
+      ],
+      [
+        9,
+        0
+      ]
+    ],
+    [
+      [
+        8,
+        1
+      ],
+      [
+        9,
+        1
+      ]
+    ],
+    [
+      [
+        8,
+        2
+      ],
+      [
+        8,
+        3
+      ]
+    ],
+    [
+      [
+        8,
+        3
+      ],
+      [
+        8,
+        4
+      ]
+    ],
+    [
+      [
+        8,
+        3
+      ],
+      [
+        9,
+        3
+      ]
+    ],
+    [
+      [
+        8,
+        4
+      ],
+      [
+        9,
+        4
+      ]
+    ],
+    [
+      [
+        8,
+        6
+      ],
+      [
+        8,
+        7
+      ]
+    ],
+    [
+      [
+        8,
+        6
+      ],
+      [
+        9,
+        6
+      ]
+    ],
+    [
+      [
+        8,
+        7
+      ],
+      [
+        9,
+        7
+      ]
+    ],
+    [
+      [
+        8,
+        9
+      ],
+      [
+        8,
+        10
+      ]
+    ],
+    [
+      [
+        8,
+        9
+      ],
+      [
+        9,
+        9
+      ]
+    ],
+    [
+      [
+        8,
+        10
+      ],
+      [
+        9,
+        10
+      ]
+    ],
+    [
+      [
+        9,
+        0
+      ],
+      [
+        10,
+        0
+      ]
+    ],
+    [
+      [
+        9,
+        1
+      ],
+      [
+        9,
+        2
+      ]
+    ],
+    [
+      [
+        9,
+        2
+      ],
+      [
+        9,
+        3
+      ]
+    ],
+    [
+      [
+        9,
+        2
+      ],
+      [
+        10,
+        2
+      ]
+    ],
+    [
+      [
+        9,
+        4
+      ],
+      [
+        9,
+        5
+      ]
+    ],
+    [
+      [
+        9,
+        4
+      ],
+      [
+        10,
+        4
+      ]
+    ],
+    [
+      [
+        9,
+        5
+      ],
+      [
+        9,
+        6
+      ]
+    ],
+    [
+      [
+        9,
+        7
+      ],
+      [
+        9,
+        8
+      ]
+    ],
+    [
+      [
+        9,
+        7
+      ],
+      [
+        10,
+        7
+      ]
+    ],
+    [
+      [
+        9,
+        8
+      ],
+      [
+        10,
+        8
+      ]
+    ],
+    [
+      [
+        9,
+        9
+      ],
+      [
+        9,
+        10
+      ]
+    ],
+    [
+      [
+        9,
+        9
+      ],
+      [
+        10,
+        9
+      ]
+    ],
+    [
+      [
+        9,
+        10
+      ],
+      [
+        10,
+        10
+      ]
+    ],
+    [
+      [
+        10,
+        0
+      ],
+      [
+        10,
+        1
+      ]
+    ],
+    [
+      [
+        10,
+        1
+      ],
+      [
+        10,
+        2
+      ]
+    ],
+    [
+      [
+        10,
+        2
+      ],
+      [
+        10,
+        3
+      ]
+    ],
+    [
+      [
+        10,
+        3
+      ],
+      [
+        10,
+        4
+      ]
+    ],
+    [
+      [
+        10,
+        5
+      ],
+      [
+        10,
+        6
+      ]
+    ],
+    [
+      [
+        10,
+        6
+      ],
+      [
+        10,
+        7
+      ]
+    ],
+    [
+      [
+        10,
+        7
+      ],
+      [
+        10,
+        8
+      ]
+    ],
+    [
+      [
+        10,
+        8
+      ],
+      [
+        10,
+        9
+      ]
+    ],
+    [
+      [
+        10,
+        9
+      ],
+      [
+        10,
+        10
+      ]
+    ]
+  ],
+  "wall_rectangles": [
+    {
+      "x": 106,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 458,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1162,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1514,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1866,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2218,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2570,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2922,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 3274,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 3626,
+      "y": 68,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1162,
+      "y": 420,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1514,
+      "y": 420,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1866,
+      "y": 420,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2218,
+      "y": 420,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2570,
+      "y": 420,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2922,
+      "y": 420,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 3274,
+      "y": 420,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 458,
+      "y": 772,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 772,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1866,
+      "y": 772,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2570,
+      "y": 772,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2922,
+      "y": 772,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 106,
+      "y": 1124,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 1124,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1866,
+      "y": 1124,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2570,
+      "y": 1124,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 458,
+      "y": 1476,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 1476,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2570,
+      "y": 1476,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 3274,
+      "y": 1476,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 458,
+      "y": 1828,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 1828,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2218,
+      "y": 1828,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2922,
+      "y": 1828,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 3626,
+      "y": 1828,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 458,
+      "y": 2180,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2218,
+      "y": 2180,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2922,
+      "y": 2180,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 2532,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1866,
+      "y": 2532,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 3274,
+      "y": 2532,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 458,
+      "y": 2884,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 2884,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1866,
+      "y": 2884,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2218,
+      "y": 2884,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2922,
+      "y": 2884,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 3236,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1514,
+      "y": 3236,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1866,
+      "y": 3236,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2922,
+      "y": 3236,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 3274,
+      "y": 3236,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 3588,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2218,
+      "y": 3588,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2570,
+      "y": 3588,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 106,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 458,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 810,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1162,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1514,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 1866,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2218,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2570,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 2922,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 3274,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 3626,
+      "y": 3940,
+      "width": 364,
+      "height": 88
+    },
+    {
+      "x": 68,
+      "y": 106,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 458,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 810,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 1162,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 1514,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 1866,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 2218,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 2570,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 2922,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 3274,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 68,
+      "y": 3626,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 420,
+      "y": 1162,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 420,
+      "y": 1866,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 420,
+      "y": 2218,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 420,
+      "y": 2922,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 420,
+      "y": 3274,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 772,
+      "y": 810,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 772,
+      "y": 1866,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 772,
+      "y": 2570,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1124,
+      "y": 458,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1124,
+      "y": 810,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1124,
+      "y": 2218,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1124,
+      "y": 2570,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1476,
+      "y": 810,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1476,
+      "y": 1866,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1476,
+      "y": 2922,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1828,
+      "y": 458,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1828,
+      "y": 810,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1828,
+      "y": 2218,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1828,
+      "y": 2922,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 1828,
+      "y": 3626,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2180,
+      "y": 458,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2180,
+      "y": 1162,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2180,
+      "y": 2922,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2180,
+      "y": 3274,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2532,
+      "y": 810,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2532,
+      "y": 1162,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2532,
+      "y": 2922,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2884,
+      "y": 810,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2884,
+      "y": 1866,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2884,
+      "y": 2218,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2884,
+      "y": 2570,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2884,
+      "y": 2922,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 2884,
+      "y": 3274,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3236,
+      "y": 810,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3236,
+      "y": 1866,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3236,
+      "y": 2922,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3588,
+      "y": 458,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3588,
+      "y": 1162,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3588,
+      "y": 1866,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3588,
+      "y": 2218,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 106,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 458,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 810,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 1162,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 1514,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 1866,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 2218,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 2570,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 2922,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 3274,
+      "width": 88,
+      "height": 364
+    },
+    {
+      "x": 3940,
+      "y": 3626,
+      "width": 88,
+      "height": 364
+    }
+  ],
+  "spawn_centres": [
+    [
+      288,
+      288
+    ],
+    [
+      3808,
+      3808
+    ]
+  ],
+  "note": "Wall rectangles only; blocked-cell buildings/trees/containers also block movement. Decorative PNG alpha is not a collision box."
+}

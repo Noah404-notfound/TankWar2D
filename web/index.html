@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="vi">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111813">
+  <title>TankWar</title>
+  <link rel="stylesheet" href="style.css?v=41">
+</head>
+
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" id="brand-home" aria-label="Về trang chủ">
+        <span class="brand-mark"><span></span><span></span><span></span></span>
+        <span>TANK<span class="brand-accent">WAR</span><small>
+      </a>
+      <div class="topbar-right">
+        <span id="connection-pill" class="status-pill idle"><i></i><span id="connection-text">SẴN SÀNG KẾT
+            NỐI</span></span>
+        <button class="icon-button" id="sound-toggle" type="button" title="Bật/tắt âm báo"
+          aria-label="Bật tắt âm báo">♫</button>
+      </div>
+    </header>
+
+    <main>
+      <section id="home-screen" class="screen home-layout">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-line"></span> 2D MULTIPLAYER TANK COMBAT</div>
+          <h1>VÀO TRẬN.<br><span>ĐỪNG ĐỨNG YÊN.</span></h1>
+          <p class="hero-text">Điều khiển xe tăng, luồn qua mê cung và hạ đối thủ. Chơi thử ngay trong trình duyệt hoặc
+            kết nối Haskell game server để đấu cùng bạn bè.</p>
+          <div class="hero-stats">
+            <div><strong>2–4</strong><span>NGƯỜI CHƠI</span></div>
+            <div><strong>WASD</strong><span>DI CHUYỂN</span></div>
+            <div><strong>60</strong><span>TICK / GIÂY*</span></div>
+          </div>
+        </div>
+        <div class="menu-card">
+          <div class="card-kicker" aria-hidden="true">PLAYER TERMINAL / 01</div>
+          <h2 aria-hidden="true">VÀO GAME</h2>
+          <!-- The value is retained for the existing WebSocket login; players edit it only in the garage. -->
+          <label for="player-name" class="visually-hidden">TÊN CHIẾN BINH</label>
+          <input id="player-name" class="visually-hidden" type="text" maxlength="20" autocomplete="nickname" value="">
+          <div class="field-row">
+            <div class="field-grow">
+              <label for="server-url" class="visually-hidden">HASKELL SERVER · WEBSOCKET</label>
+              <input id="server-url" class="visually-hidden" type="url" value="ws://localhost:3000" spellcheck="false">
+            </div>
+          </div>
+          <button class="asset-menu-button find-room-action" id="online-button" type="button"
+            aria-label="Tìm phòng online"><img src="assets/menu/timphong.png" alt="Tìm phòng"></button>
+          <button class="asset-menu-button start-room-action" id="practice-button" type="button"
+            aria-label="Bắt đầu phòng với bot"><img src="assets/menu/batdauphong.png" alt="Bắt đầu phòng"></button>
+          <button class="asset-exit" id="main-exit" type="button"><img src="assets/menu/exit.png"
+              alt="Thoát game"></button>
+          <p class="fine-print">CHỌN XE TĂNG VÀ ĐẶT TÊN Ở BƯỚC TIẾP THEO.</p>
+          <div id="home-error" class="inline-error" role="status" hidden></div>
+        </div>
+        <div class="hero-bottom"><span>TACTICAL ARENA / BUILD 0.2</span><span>HASKELL SERVER · HTML5 CANVAS
+            CLIENT</span></div>
+      </section>
+
+      <section id="map-screen" class="screen map-screen" hidden>
+        <div class="map-layout">
+          <section class="map-settings-panel map-asset-panel map-asset-panel-portrait" aria-label="Thiết lập trận đấu">
+            <img class="map-panel-frame" src="assets/menu/khungchonmap1.png" alt="" aria-hidden="true">
+            <header class="map-settings-heading">
+              <span id="map-settings-title">THIẾT LẬP TRẬN</span>
+              <p id="map-settings-subtitle">Chọn thông số trước khi vào trận.</p>
+            </header>
+                        <div id="match-setup" class="match-setup" aria-label="Thiết lập trận">
+              <div class="setup-group" id="setup-category-group"><span class="setup-label">HÌNH THỨC</span>
+                <div class="setup-dd"><button class="setup-chip setup-dd-trigger active" type="button" aria-haspopup="true"
+                    aria-expanded="false" id="setup-category-trigger"><span id="dd-category-label">🤖 ĐẤU BOT</span><i class="setup-caret"
+                      aria-hidden="true">▾</i></button>
+                  <div class="setup-dd-menu" hidden>
+                    <button class="setup-dd-item active" type="button" data-match-category="bot">🤖 ĐẤU BOT</button>
+                    <button class="setup-dd-item" type="button" data-match-category="pvp">⚔️ GHÉP PHÒNG (PVP)</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- CHẾ ĐỘ: TỬ CHIẾN, ĐẤU ĐỘI (2v2..5v5), CẤM ĐỊA (2v2..5v5) - HIỆN Ở CẢ 2 HÌNH THỨC -->
+              <div class="setup-group" id="setup-mode-group"><span class="setup-label">CHẾ ĐỘ</span>
+                <div class="setup-options" role="group"><button class="setup-chip active" type="button" data-team="0">TỬ
+                    CHIẾN</button>
+                  <div class="setup-dd"><button class="setup-chip setup-dd-trigger" type="button" aria-haspopup="true"
+                      aria-expanded="false"><span id="dd-team-label">ĐẤU ĐỘI</span><i class="setup-caret"
+                        aria-hidden="true">▾</i></button>
+                    <div class="setup-dd-menu" hidden><button class="setup-dd-item" type="button"
+                        data-team="2">2V2</button><button class="setup-dd-item" type="button"
+                        data-team="3">3V3</button><button class="setup-dd-item" type="button"
+                        data-team="4">4V4</button><button class="setup-dd-item" type="button" data-team="5">5V5</button>
+                    </div>
+                  </div>
+                  <div class="setup-dd"><button class="setup-chip setup-dd-trigger" type="button" aria-haspopup="true"
+                      aria-expanded="false"><span id="dd-zone-label">CẤM ĐỊA</span><i class="setup-caret"
+                        aria-hidden="true">▾</i></button>
+                    <div class="setup-dd-menu" hidden><button class="setup-dd-item" type="button"
+                        data-zone="2">2V2</button><button class="setup-dd-item" type="button"
+                        data-zone="3">3V3</button><button class="setup-dd-item" type="button"
+                        data-zone="4">4V4</button><button class="setup-dd-item" type="button" data-zone="5">5V5</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- PHẦN THIẾT LẬP DÀNH RIÊNG CHO BOT -->
+              <div id="bot-setup-container">
+                <div class="setup-group"><span class="setup-label">ĐỘ KHÓ BOT</span>
+                  <div class="setup-options" role="group"><button class="setup-chip" type="button"
+                      data-difficulty="easy">EASY</button><button class="setup-chip active" type="button"
+                      data-difficulty="medium">MEDIUM</button><button class="setup-chip" type="button"
+                      data-difficulty="hard">HARD</button><button class="setup-chip" type="button"
+                      data-difficulty="extreme">EXTREME</button></div>
+                </div>
+                <div class="setup-group" id="setup-bots-group"><span class="setup-label">SỐ BOT</span>
+                  <div class="setup-dd"><button class="setup-chip setup-dd-trigger" type="button" aria-haspopup="true"
+                      aria-expanded="false"><span id="dd-bots-label">3 BOT</span><i class="setup-caret"
+                        aria-hidden="true">▾</i></button>
+                    <div class="setup-dd-menu" hidden><button class="setup-dd-item" type="button" data-bots="1">1
+                        BOT</button><button class="setup-dd-item" type="button" data-bots="2">2 BOT</button><button
+                        class="setup-dd-item active" type="button" data-bots="3">3 BOT</button><button class="setup-dd-item"
+                        type="button" data-bots="4">4 BOT</button><button class="setup-dd-item" type="button" data-bots="5">5
+                        BOT</button><button class="setup-dd-item" type="button" data-bots="6">6 BOT</button><label
+                        class="setup-dd-custom"><span>TÙY CHỌN</span><input id="setup-bots-input" class="setup-input"
+                          type="number" inputmode="numeric" step="1" min="1" max="10"
+                          aria-label="Nhập số bot (tối đa 10)"><span>/ 10</span></label></div>
+                  </div>
+                </div>
+                <div class="setup-group" id="setup-time-group"><span class="setup-label" id="setup-time-label">THỜI GIAN
+                    TRẬN</span>
+                  <div class="setup-dd"><button class="setup-chip setup-dd-trigger" type="button" aria-haspopup="true"
+                      aria-expanded="false"><span id="dd-time-label">5 PHÚT</span><i class="setup-caret"
+                        aria-hidden="true">▾</i></button>
+                    <div class="setup-dd-menu" hidden>
+                      <div id="setup-time-options" class="setup-dd-list" role="group"></div><label
+                        class="setup-dd-custom"><span>TÙY CHỌN</span><input id="setup-time-input" class="setup-input"
+                          type="number" inputmode="decimal" step="0.5" min="1" max="20"
+                          aria-label="Nhập số phút (tối đa 20)"><span>PHÚT</span></label>
+                    </div>
+                  </div>
+                </div>
+                <div class="setup-group" id="setup-rounds-group" hidden><span class="setup-label">SỐ ROUND</span>
+                  <div class="setup-options" id="setup-rounds-options" role="group"></div><label class="setup-custom"><input
+                      id="setup-rounds-input" class="setup-input" type="number" inputmode="numeric" step="1" min="1" max="20"
+                      aria-label="Nhập số ván"><span id="setup-rounds-need"></span></label>
+                </div>
+                <p id="setup-hint" class="setup-hint"></p>
+              </div>
+
+              <!-- PHẦN GHÉP PHÒNG PVP -->
+              <div id="matchmaking-container" class="matchmaking-container" hidden>
+                <div class="mm-card">
+                  <div class="mm-badge"><span class="mm-live-dot"></span><span id="mm-badge-text">GHÉP PHÒNG TỬ CHIẾN (1V1)</span></div>
+                  <div class="mm-radar-area">
+                    <div class="mm-radar" id="mm-radar">
+                      <div class="mm-radar-sweep"></div>
+                      <div class="mm-radar-ring mm-ring-1"></div>
+                      <div class="mm-radar-ring mm-ring-2"></div>
+                      <div class="mm-radar-center">⚔️</div>
+                    </div>
+                    <div class="mm-info-block">
+                      <div class="mm-status" id="mm-status-text">SẴN SÀNG TÌM ĐỐI THỦ</div>
+                      <div class="mm-timer" id="mm-timer" hidden>00:00</div>
+                      <p class="mm-subtext" id="mm-subtext">Hàng chờ 1v1 PvP ngẫu nhiên. Cần 2 người chơi.</p>
+                    </div>
+                  </div>
+                  <div class="mm-actions">
+                    <button class="primary-button mm-btn-start" id="mm-start-btn" type="button">⚔️ TÌM TRẬN TỬ CHIẾN</button>
+                    <button class="secondary-button mm-btn-cancel" id="mm-cancel-btn" type="button" hidden>✕ HỦY TÌM TRẬN</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="online-match-setup" class="online-match-setup" hidden aria-label="Thiết lập trận online">
+              <p class="online-setup-note">CHỌN PHE TRƯỚC, SAU ĐÓ BỎ PHIẾU BẢN ĐỒ</p>
+              <div id="online-team-picker" class="online-team-picker" hidden>
+                <div class="online-section-heading"><span>CHỌN PHE</span><small>CHẠM VÀO ĐỘI MUỐN THAM GIA</small></div>
+                <button id="online-team-blue" type="button" class="team-row team-row-blue"><span>ĐỘI XANH</span><span class="team-slots"></span></button>
+                <button id="online-team-red" type="button" class="team-row team-row-red"><span>ĐỘI ĐỎ</span><span class="team-slots"></span></button>
+              </div>
+              <div class="online-vote-heading"><span>NGƯỜI CHƠI</span><small>BẢN ĐỒ ĐÃ CHỌN</small></div>
+              <div id="online-player-votes" class="online-player-votes"></div>
+              <p id="online-vote-summary" class="online-vote-summary"></p>
+              <button id="online-start-match" class="primary-button online-start-match" type="button">▶ BẮT ĐẦU TRẬN</button>
+            </div>
+          </section>
+          <section class="map-picker map-asset-panel map-asset-panel-wide" aria-label="Chọn chiến trường">
+            <img class="map-panel-frame" src="assets/menu/khungchonmap2.png" alt="" aria-hidden="true">
+            <header class="map-picker-heading">CHỌN CHIẾN TRƯỜNG</header>
+            <div class="map-choice-grid" role="list" aria-label="Chọn bản đồ">
+              <button class="map-choice camdia" type="button" data-map="camdia" role="listitem" hidden
+                aria-label="Chọn bản đồ Cấm Địa"><span class="map-choice-number">ZD</span><span
+                  class="map-choice-copy map-choice-camdia"><strong>CẤM ĐỊA</strong><small>CHIẾM VÙNG DI ĐỘNG</small></span></button>
+              <button class="map-choice forest" type="button" data-map="forest" role="listitem" aria-label="Chọn bản đồ Forest"><span
+                  class="map-choice-number">01</span><span class="map-choice-copy"><img src="assets/maps/forest_name.png"
+                    alt="Forest"></span></button>
+              <button class="map-choice ruins" type="button" data-map="ruins" role="listitem" aria-label="Chọn bản đồ Ruins"><span
+                  class="map-choice-number">02</span><span class="map-choice-copy"><img src="assets/maps/ruins_name.png"
+                    alt="Ruins"></span></button>
+              <button class="map-choice depot" type="button" data-map="depot" role="listitem" aria-label="Chọn bản đồ Depot"><span
+                  class="map-choice-number">03</span><span class="map-choice-copy"><img src="assets/maps/depot_name.png"
+                    alt="Depot"></span></button>
+              <button class="map-choice random" type="button" data-map="random" role="listitem" aria-label="Bỏ phiếu bản đồ ngẫu nhiên"><span
+                  class="map-choice-number">?</span><span class="map-choice-copy map-choice-random">NGẪU NHIÊN</span></button>
+            </div>
+          </section>
+        </div>
+        <button class="asset-exit map-exit" id="map-back" type="button"><img src="assets/menu/exit.png"
+            alt="Thoát"></button>
+        <div id="map-error" class="inline-error" role="status" hidden></div>
+      </section>
+
+      <section id="tank-select-screen" class="screen tank-select-screen" hidden>
+        <div class="tank-select-layout">
+          <section class="tank-assembly-card" aria-label="Xem trước xe tăng đã lắp">
+            <div class="tank-assembly-stage" aria-label="Xem trước xe tăng đã lắp">
+              <img id="tank-preview-hull" class="assembly-hull" src="assets/tanks/hull_05.png"
+                alt="Thân xe tăng đã chọn">
+              <img id="tank-preview-gun" class="assembly-gun" src="assets/tanks/gun_05.png" alt="Nòng pháo đã chọn">
+            </div>
+            <div class="visually-hidden"><span id="selected-hull-label">THÂN 05</span><span id="selected-gun-label">NÒNG
+                05</span></div>
+          </section>
+          <section class="tank-selection-card" aria-label="Chọn thân xe và nòng pháo">
+            <div class="garage-name-plate">
+              <img src="assets/menu/ghiten.png" alt="" aria-hidden="true">
+              <img class="garage-name-title" src="assets/menu/datten.png" alt="Đặt tên">
+              <label class="visually-hidden" for="tank-name">Tên chiến binh</label>
+              <input id="tank-name" type="text" maxlength="20" autocomplete="nickname" placeholder="Nhập tên của bạn">
+            </div>
+            <div class="part-picker">
+              <div class="part-options" role="list" aria-label="Chọn thân xe">
+                <button class="part-option" type="button" data-hull="01" role="listitem"><img
+                    src="assets/tanks/hull_01.png" alt="Thân xe 01"></button>
+                <button class="part-option" type="button" data-hull="02" role="listitem"><img
+                    src="assets/tanks/hull_02.png" alt="Thân xe 02"></button>
+                <button class="part-option active" type="button" data-hull="05" role="listitem"><img
+                    src="assets/tanks/hull_05.png" alt="Thân xe 05"></button>
+              </div>
+            </div>
+            <div class="part-picker">
+              <div class="part-options" role="list" aria-label="Chọn nòng pháo">
+                <button class="part-option" type="button" data-gun="01" role="listitem"><img
+                    src="assets/tanks/gun_01.png" alt="Nòng pháo 01"></button>
+                <button class="part-option active" type="button" data-gun="05" role="listitem"><img
+                    src="assets/tanks/gun_05.png" alt="Nòng pháo 05"></button>
+                <button class="part-option" type="button" data-gun="06" role="listitem"><img
+                    src="assets/tanks/gun_06.png" alt="Nòng pháo 06"></button>
+              </div>
+            </div>
+            <button id="tank-confirm" class="asset-action" type="button"><img src="assets/menu/batdauphong.png"
+                alt="Bắt đầu phòng"></button>
+            <button class="asset-exit garage-exit" id="tank-select-back" type="button"><img src="assets/menu/exit.png"
+                alt="Thoát"></button>
+            <p id="tank-select-note" class="visually-hidden">Bản thử sẽ ghép cùng bot.</p>
+          </section>
+        </div>
+      </section>
+
+      <section id="lobby-screen" class="screen lobby-screen" hidden>
+        <div class="page-heading">
+          <div><img class="lobby-title-asset" src="assets/menu/timphong.png" alt="Tìm phòng">
+            <h1>PHÒNG CHIẾN ĐẤU</h1>
+          </div>
+          <button class="asset-exit compact-exit" id="lobby-back" type="button"><img src="assets/menu/exit.png"
+              alt="Thoát về trang chủ"></button>
+        </div>
+        <div class="lobby-grid">
+          <section class="panel room-list-panel asset-panel asset-panel-wide">
+            <img class="asset-panel-frame asset-panel-frame-wide" src="assets/menu/lobby-frame-wide.png" alt=""
+              aria-hidden="true">
+            <div class="panel-heading">
+              <div><h2>PHÒNG ĐANG MỞ</h2></div>
+            </div>
+            <div id="room-list" class="room-list">
+              <div class="empty-state"><span class="empty-icon">⌁</span><strong>CHƯA CÓ DỮ LIỆU</strong><small>Đang chờ
+                  danh sách phòng từ server…</small></div>
+            </div>
+            <div class="join-row">
+              <div class="field-grow"><label for="join-id">MÃ PHÒNG</label><input id="join-id" type="text" maxlength="6"
+                  placeholder="ABC123" autocomplete="off"></div>
+              <div class="field-grow"><label for="join-password">MẬT KHẨU (NẾU CÓ)</label><input id="join-password"
+                  type="password" placeholder="Không bắt buộc"></div><button class="small-primary" id="join-button"
+                type="button">VÀO PHÒNG →</button>
+            </div>
+          </section>
+          <section class="panel create-panel asset-panel asset-panel-portrait">
+            <img class="asset-panel-frame" src="assets/menu/lobby-frame-portrait.png" alt="" aria-hidden="true">
+            <div class="create-room-content">
+              <div class="panel-heading">
+                <div><h2>TẠO PHÒNG MỚI</h2></div>
+              </div>
+              <label for="room-name">TÊN PHÒNG</label><input id="room-name" type="text" maxlength="32"
+                placeholder="Ví dụ: Đấu với bạn bè">
+              <label for="max-players">SỐ NGƯỜI CHƠI TỐI ĐA</label><select id="max-players">
+                <option value="2">2 NGƯỜI</option>
+                <option value="3">3 NGƯỜI</option>
+                <option value="4" selected>4 NGƯỜI</option>
+                <option value="5">5 NGƯỜI</option>
+                <option value="6">6 NGƯỜI</option>
+                <option value="7">7 NGƯỜI</option>
+                <option value="8">8 NGƯỜI</option>
+                <option value="9">9 NGƯỜI</option>
+                <option value="10">10 NGƯỜI</option>
+              </select>
+              <label for="room-mode">CHẾ ĐỘ TRẬN</label><select id="room-mode">
+                <option value="deathmatch">TỬ CHIẾN</option>
+                <option value="team">ĐẤU ĐỘI</option>
+                <option value="zone">CẤM ĐỊA</option>
+              </select>
+              <label for="create-password">MẬT KHẨU <span class="label-muted">(TÙY CHỌN)</span></label><input
+                id="create-password" type="password" maxlength="30" placeholder="Để trống nếu phòng công khai">
+              <button class="primary-button" id="create-button" type="button">＋ TẠO PHÒNG ONLINE</button>
+            </div>
+          </section>
+        </div>
+        <div id="lobby-error" class="inline-error" role="status" hidden></div>
+      </section>
+
+      <section id="room-screen" class="screen room-screen" hidden>
+        <div class="page-heading compact-heading">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-line"></span> READY ROOM</div>
+            <h1 id="room-title">PHÒNG CHIẾN ĐẤU</h1>
+            <p id="room-caption">Chờ thêm chiến binh.</p>
+          </div>
+          <div class="room-code"><small>MÃ PHÒNG</small><strong id="room-code">------</strong><button
+              id="copy-room-code" class="copy-button" type="button" title="Sao chép mã phòng">⧉</button></div>
+        </div>
+        <div class="room-grid">
+          <div class="panel room-players-panel room-asset-panel room-asset-panel-wide">
+            <img class="room-panel-frame room-panel-frame-wide" src="assets/menu/khungchonmap2.png" alt=""
+              aria-hidden="true">
+            <div class="panel-heading">
+              <div><span class="panel-index">01</span>
+                <h2>ĐỘI HÌNH</h2>
+              </div><span id="players-counter" class="counter">1 / 4</span>
+            </div>
+            <div class="room-mode-line">CHẾ ĐỘ: <strong id="room-mode-label">TỬ CHIẾN</strong></div>
+            <div id="room-players" class="player-list"></div>
+            <div id="countdown-banner" class="countdown-banner" hidden></div>
+            <div class="room-actions"><button class="primary-button" id="start-button" type="button">▶ BẮT ĐẦU
+                TRẬN</button><button class="asset-exit compact-exit" id="leave-room" type="button"><img
+                  src="assets/menu/exit.png" alt="Rời phòng"></button></div>
+            <div id="room-error" class="inline-error" role="status" hidden></div>
+            <p class="fine-print">Chỉ chủ phòng có quyền bắt đầu trận đấu.</p>
+          </div>
+          <div class="panel room-briefing room-asset-panel room-asset-panel-portrait">
+            <img class="room-panel-frame" src="assets/menu/khungchonmap1.png" alt="" aria-hidden="true">
+            <div class="panel-heading">
+              <div><span class="panel-index">02</span>
+                <h2>HƯỚNG DẪN TÁC CHIẾN</h2>
+              </div>
+            </div>
+            <div class="brief-row"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd><span>Di chuyển xe tăng</span></div>
+            <div class="brief-row"><span class="mouse-icon">⌖</span><span>Di chuyển chuột</span><span
+                class="brief-detail">Xoay nòng pháo</span></div>
+            <div class="brief-row"><kbd>SPACE</kbd><span>Bắn đạn</span></div>
+            <div class="brief-row"><span class="weapon-icon">?</span><span>Hộp bí ẩn</span><span
+                class="brief-detail">Buff vũ khí 15 giây</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="game-screen" class="screen game-screen" hidden>
+        <div class="game-toolbar">
+          <div class="match-label"><span class="live-dot"></span><span id="match-mode">LIVE MATCH</span><strong
+              id="phase-label">ĐANG CHỜ</strong></div>
+          <div class="match-stats">
+            <div><small>PHÒNG</small><strong id="match-room">OFFLINE</strong></div>
+            <div><small>NGƯỜI CHƠI</small><strong id="match-player-count">1</strong></div>
+            <div><small>ĐIỂM CỦA BẠN</small><strong id="match-score">0</strong></div>
+          </div>
+        </div>
+        <div class="arena-layout">
+          <div class="arena-frame">
+            <div class="arena-corner tl"></div>
+            <div class="arena-corner tr"></div>
+            <div class="arena-corner bl"></div>
+            <div class="arena-corner br"></div><canvas id="game-canvas" width="832" height="576" tabindex="0"
+              aria-label="Màn hình TankWar"></canvas>
+            <div id="match-clock" class="match-clock" aria-label="Thời gian trận đấu">00:00</div>
+            <div id="kill-board" class="kill-board" hidden aria-label="Tổng số hạ gục của hai phe"><b id="kb-blue" class="kb-cell blue">0</b><span class="kb-mid"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 3l9 9M13 3l-9 9"/><path d="M9.4 13.6l4.2-4.2M2.4 9.4l4.2 4.2"/></g></svg></span><b id="kb-red" class="kb-cell red">0</b></div>
+            <div id="round-score" class="round-score" hidden aria-label="Tỷ số các ván"><span id="round-label"
+                class="round-label">ROUND 1/5</span><strong class="round-wins"><span id="round-wins-me"
+                  class="me">0</span><i>:</i><span id="round-wins-enemy" class="enemy">0</span></strong><span
+                id="round-alive" class="round-alive"></span></div>
+            <div id="zone-hud" class="zone-hud" hidden aria-label="Cấm Địa">
+              <div class="zone-bars">
+                <div class="zone-bar blue"><i id="zone-fill-blue"></i><svg class="zone-lock" viewBox="0 0 16 16"
+                    aria-hidden="true">
+                    <path d="M4 7V5a4 4 0 0 1 8 0v2h1v7H3V7h1zm2 0h4V5a2 2 0 0 0-4 0v2z" />
+                  </svg><b id="zone-pct-blue">0%</b></div>
+                <div class="zone-center" id="zone-center">10</div>
+                <div class="zone-bar red"><i id="zone-fill-red"></i><svg class="zone-lock" viewBox="0 0 16 16"
+                    aria-hidden="true">
+                    <path d="M4 7V5a4 4 0 0 1 8 0v2h1v7H3V7h1zm2 0h4V5a2 2 0 0 0-4 0v2z" />
+                  </svg><b id="zone-pct-red">0%</b></div>
+              </div>
+              <div class="zone-hold" id="zone-hold" aria-label="Thanh tranh đoạt"><i id="zone-hold-fill"></i></div>
+              <div class="zone-counts"><span class="zone-dots blue" id="zone-dots-blue"></span><b class="blue"
+                  id="zone-in-blue">0</b><span class="zone-in-label">TRONG VÙNG</span><b class="red"
+                  id="zone-in-red">0</b><span class="zone-dots red" id="zone-dots-red"></span></div>
+              <div class="zone-status" id="zone-status"></div>
+            </div>
+            <div id="mini-kda" class="mini-kda" aria-label="Chỉ số của bạn">
+              <strong class="mini-kda-numbers" title="Hạ gục / Bị hạ"><span id="kda-kills">0</span><i>/</i><span
+                  id="kda-deaths">0</span></strong>
+              <span id="kda-points" class="mini-kda-points">SCORE: 0</span>
+              <span id="kda-streak" class="mini-kda-streak" hidden>CHUỖI: 0</span>
+            </div>
+            <div id="kill-feed" class="kill-feed" aria-live="polite"></div>
+            <div id="kill-banner" class="kill-banner" hidden aria-live="polite">
+              <span class="kill-banner-kicker">ELIMINATION</span>
+              <strong id="kill-banner-title">DOUBLE KILL</strong>
+              <span id="kill-banner-subtitle" class="kill-banner-subtitle"></span>
+            </div>
+            <div id="respawn-banner" class="respawn-banner" hidden aria-live="polite">
+              <span id="respawn-by" class="respawn-by">YOU HAVE BEEN ELIMINATED</span>
+              <strong id="respawn-count" class="respawn-count">5.0</strong>
+              <span class="respawn-label">SECONDS TO RESPAWN</span>
+            </div>
+            <div id="shield-chip" class="shield-chip" hidden>INVINCIBLE <span id="shield-time">1.5s</span></div>
+            <div id="tab-scoreboard" class="tab-scoreboard" hidden role="dialog" aria-label="Bảng K/D trận đấu">
+              <section class="tab-scoreboard-card">
+                <div class="tab-scoreboard-heading">
+                  <div><span class="tab-scoreboard-kicker">MATCH STATS</span>
+                    <h2>BẢNG K/D</h2>
+                  </div><span class="tab-scoreboard-hint">GIỮ TAB ĐỂ XEM</span>
+                </div>
+                <div class="tab-scoreboard-table-wrap">
+                  <table class="tab-scoreboard-table">
+                    <thead>
+                      <tr>
+                        <th>NGƯỜI CHƠI</th>
+                        <th>K</th>
+                        <th>D</th>
+                        <th>SCORE</th>
+                        <th>CHUỖI</th>
+                        <th>TRẠNG THÁI</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tab-scoreboard-body">
+                      <tr>
+                        <td colspan="6">Đang chờ dữ liệu…</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="tab-scoreboard-footer">ESC: CÀI ĐẶT <span>·</span> R: NẠP ĐẠN</div>
+              </section>
+            </div>
+            <div id="pause-modal" class="arena-overlay pause-overlay" hidden role="dialog"
+              aria-label="Cài đặt trận đấu">
+              <div class="overlay-card pause-card">
+                <img class="pause-frame-art" src="assets/menu/khungchonmap1.png" alt="" aria-hidden="true">
+                <div class="pause-content">
+                  <span class="overlay-kicker">TẠM DỪNG</span>
+                  <h2>CÀI ĐẶT</h2>
+                  <p>Trận online vẫn tiếp tục trên server khi bạn mở bảng này.</p>
+                  <div class="pause-settings-group">
+                    <button id="pause-sound-btn" class="secondary-button pause-opt-btn" type="button">ÂM THANH: <span
+                        id="pause-sound-label">BẬT</span></button>
+                    <button id="pause-fullscreen-btn" class="secondary-button pause-opt-btn" type="button">TOÀN MÀN
+                      HÌNH</button>
+                  </div>
+                  <label class="pause-volume-row" for="pause-volume"><span>NHẠC NỀN</span><input id="pause-volume"
+                      type="range" min="0" max="100" step="5" value="100"><output
+                      id="pause-volume-value">100%</output></label>
+                  <div class="pause-actions-group">
+                    <button id="pause-resume-btn" class="pause-asset-action" type="button"><img
+                        src="assets/menu/tieptuc.png" alt="Tiếp tục"></button>
+                    <button id="pause-leave-btn" class="pause-asset-action" type="button"><img
+                        src="assets/menu/exit.png" alt="Thoát trận"></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="arena-overlay" class="arena-overlay" hidden>
+              <div class="overlay-card"><span class="overlay-kicker">ROUND UPDATE</span>
+                <h2 id="overlay-title">SẴN SÀNG?</h2>
+                <p id="overlay-text">Trận đấu sẽ bắt đầu ngay.</p><button id="overlay-action" class="primary-button"
+                  type="button">TIẾP TỤC</button>
+              </div>
+            </div>
+          </div>
+          <aside class="match-sidebar">
+            <div class="panel sidebar-panel">
+              <div class="panel-heading">
+                <div><span class="panel-index">01</span>
+                  <h2>BẢNG ĐIỂM</h2>
+                </div>
+              </div>
+              <div id="scoreboard" class="scoreboard"></div>
+            </div>
+            <div class="panel sidebar-panel weapon-panel">
+              <div class="panel-heading">
+                <div><span class="panel-index">02</span>
+                  <h2>TRẠNG THÁI VŨ KHÍ</h2>
+                </div>
+              </div>
+              <div class="weapon-state">
+                <div class="weapon-badge" id="weapon-symbol">●</div>
+                <div><strong id="weapon-name">ĐẠN THƯỜNG</strong><small id="weapon-timer">SẴN SÀNG</small></div>
+              </div>
+              <div class="cooldown-track"><span id="cooldown-fill"></span></div>
+              <p class="sidebar-help">WASD di chuyển · Chuột ngắm · Click/Space bắn · R nạp đạn · Giữ Tab xem bảng K/D.
+              </p>
+            </div>
+            <div class="panel sidebar-panel feed-panel">
+              <div class="panel-heading">
+                <div><span class="panel-index">03</span>
+                  <h2>CHIẾN BÁO</h2>
+                </div>
+              </div>
+              <div id="event-feed" class="event-feed">
+                <div class="feed-item muted">Đang chờ tín hiệu trận đấu…</div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="results-screen" class="screen results-screen" hidden>
+        <div class="results-card">
+          <span class="results-kicker" hidden>MATCH RESULT / DECLASSIFIED</span>
+          <h1 id="results-title">NHIỆM VỤ HOÀN TẤT</h1>
+          <div class="results-stats">
+            <div><strong id="results-kills">0</strong><span>HẠ GỤC</span></div>
+            <div><strong id="results-score">0</strong><span>ĐIỂM</span></div>
+            <div><strong id="results-map">FOREST</strong><span>CHIẾN TRƯỜNG</span></div>
+          </div>
+          <div class="results-you-panel"><img src="assets/menu/banthan.png" alt="Khung thành tích của bạn"><span>BẠN ·
+              <strong id="results-player-name">TANK PILOT</strong></span></div>
+          <div id="results-board" class="results-board"></div>
+          <div id="results-lol" class="results-lol" hidden></div>
+          <div class="results-actions"><button id="results-back" class="primary-button" type="button">TRỞ LẠI PHÒNG
+              ĐẤU</button><button id="results-exit" class="asset-exit compact-exit" type="button"><img
+                src="assets/menu/exit.png" alt="Thoát về trang chủ"></button></div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="testgame.js?v=17"></script>
+  <script src="app.js?v=40"></script>
+</body>
+
+</html>

@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: tankwar
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit

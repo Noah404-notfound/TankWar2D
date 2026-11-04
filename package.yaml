@@ -1,0 +1,80 @@
+name:                tankwar
+version:             0.1.0.0
+synopsis:            "TankWar - Online Multiplayer Tank Battle Game"
+description:         "A 2D top-down tank battle game with online multiplayer, mystery boxes, and MongoDB persistence."
+license:             MIT
+author:              "TankWar Team"
+
+default-extensions:
+  - OverloadedStrings
+  - DeriveGeneric
+  - DeriveAnyClass
+  - RecordWildCards
+  - ScopedTypeVariables
+  - LambdaCase
+  - TupleSections
+  - BangPatterns
+  - TypeApplications
+
+dependencies:
+  - base >= 4.14 && < 5
+  - aeson >= 2.0
+  - text >= 1.2
+  - bytestring >= 0.10
+  - containers >= 0.6
+  - directory >= 1.3
+  - filepath >= 1.4
+  - megaparsec >= 9.2
+
+library:
+  source-dirs: src
+  exposed-modules:
+    - Common.Types
+    - Common.Config
+    - Common.Protocol
+    - Common.CommandParser
+    - Common.GameRules
+
+executables:
+  tankwar-server:
+    main:          Main.hs
+    source-dirs:   server
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - "-with-rtsopts=-N"
+      - -O2
+    other-modules:
+      - Server.State
+      - Server.RoomManager
+      - Server.GameEngine
+      - Server.Persistence
+      - Server.Database.Connection
+      - Server.Database.PlayerRepo
+      - Server.Database.MatchRepo
+    dependencies:
+      - tankwar
+      - websockets >= 0.12
+      - stm >= 2.5
+      - mongoDB >= 2.7
+      - bson >= 0.4
+      - random >= 1.2
+      - time >= 1.9
+      - directory >= 1.3
+      - filepath >= 1.4
+      - megaparsec >= 9.2
+
+tests:
+  tankwar-test:
+    main: Spec.hs
+    source-dirs: test
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - "-with-rtsopts=-N"
+    dependencies:
+      - tankwar
+      - base >= 4.14 && < 5
+      - aeson >= 2.0
+      - bytestring >= 0.10
+      - text >= 1.2

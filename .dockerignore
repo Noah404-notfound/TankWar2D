@@ -1,0 +1,7 @@
+.git
+.stack-work
+dist-newstyle
+data
+.tools
+assets
+*.md
