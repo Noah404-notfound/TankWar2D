@@ -1,0 +1,44 @@
+# Chạy: docker compose -f docker-compose.tunnel.yml up -d --build
+# Xem link:  docker compose -f docker-compose.tunnel.yml logs cloudflared
+# (tìm dòng có https://xxxx.trycloudflare.com)
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  tankwar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      PORT: "10000"
+      MONGO_URI: mongodb://mongo:27017/TankWar
+    expose:
+      - "10000"
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - tankwar
+    # Quick Tunnel: không cần tài khoản, link ngẫu nhiên, đổi mỗi lần chạy lại.
+    command: tunnel --no-autoupdate --url http://tankwar:10000
+
+    # Muốn link cố định (cần tên miền đã thêm vào Cloudflare): bỏ dòng command ở trên,
+    # dùng dòng dưới và đặt TUNNEL_TOKEN trong file .env
+    # command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+
+volumes:
+  mongo-data:

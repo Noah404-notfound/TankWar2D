@@ -12,7 +12,8 @@ COPY deploy/curl-retry.sh /usr/local/bin/curl
 COPY tankwar.cabal ./
 COPY src ./src
 COPY server ./server
-RUN chmod 755 /usr/local/bin/curl
+RUN sed -i 's/\r$//' /usr/local/bin/curl /root/.config/cabal/config \
+    && chmod 755 /usr/local/bin/curl
 RUN cabal update --verbose=2
 RUN cabal build exe:tankwar-server \
     && mkdir -p /out \
@@ -36,7 +37,13 @@ COPY web /usr/share/nginx/html
 COPY deploy/nginx.conf.template /etc/nginx/nginx.conf.template
 COPY deploy/start-tankwar.sh /usr/local/bin/start-tankwar
 
-RUN chmod 755 /usr/local/bin/start-tankwar
+RUN sed -i 's/\r$//' /usr/local/bin/start-tankwar /etc/nginx/nginx.conf.template \
+    && chmod 755 /usr/local/bin/start-tankwar
+
+# Server Haskell đọc web/assets/maps/*_layout.json theo đường dẫn tương đối,
+# nên cho nó chạy từ /usr/share/nginx, nơi "web" trỏ tới thư mục web đã copy.
+RUN ln -s /usr/share/nginx/html /usr/share/nginx/web
+WORKDIR /usr/share/nginx
 
 ENV PORT=10000
 EXPOSE 10000
