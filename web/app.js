@@ -222,6 +222,8 @@
   let mapLoadError = '';
   let lastOnlineUiUpdate = 0;
   let isPaused = false;
+  let chatOpen = false, chatTeamMode = false;
+  const CHAT_MAX_LINES = 7, CHAT_FADE_MS = 9000;
   let musicScale = 1;
   let matchClockStart = 0;
   let bannerTimer = 0;
@@ -336,6 +338,7 @@
   // Team modes: in a match-point round, matchpoint.mp3 is the ONLY music (it replaces the game playlist and the 1-minute track) until the round ends.
   // matchpoint.mp3, matchpoint2.mp3 or matchpoint3.mp3 is picked at random per match-point round; a missing file is skipped.
   let matchPointActive = false, matchPointTrack = 'matchpoint';
+  let onlineMatchEnded = false;   // true từ lúc server báo hết trận đến khi có trận mới: chặn snapshot muộn kéo về màn hình game
   const matchPointBrokenNames = new Set();
   let matchPointChoice = null;   // the track picked for THIS match: random once, then the same one every match-point round
   function pickMatchPointTrack() {
@@ -797,9 +800,12 @@
 
   function showScreen(name) {
     screenName = name;
+    if (typeof ensureHistoryButton === 'function') ensureHistoryButton();
+    const pb = document.getElementById('ping-badge'); if (pb) pb.hidden = !(mode === 'online' && (name === 'game' || name === 'room'));
     Object.entries(screens).forEach(([key, el]) => { el.hidden = key !== name; });
     document.body.classList.toggle('in-game', name === 'game');
     if (name !== 'game') { document.body.classList.remove('mouse-pressed', 'player-dead', 'offline-gray'); battleMusicStopped = false; }
+    if (name !== 'game' && typeof closeChat === 'function') { closeChat(false); const cl = document.getElementById('chat-log'); if (cl) cl.innerHTML = ''; }
     if (name === 'game') startRenderLoop();
     else stopRenderLoop();
     syncMusicForScreen();
@@ -1073,9 +1079,10 @@
         addFeed(`Tìm thấy đối thủ: ${opp}! Chuẩn bị vào trận...`, 'warn');
         break;
       }
+      case 'SMatchHistory': { renderHistory(Array.isArray(data) ? data : (Array.isArray(unwrapOne(data)) ? unwrapOne(data) : [])); break; }
       case 'SMatchmakingStatus': {
         if (data && data.status === 'searching') {
-          setText('mm-status-text', `ĐANG TÌM ĐỐI THỦ... (${data.queueCount || 1} trong hàng chờ)`);
+          setText('mm-status-text', `ĐANG TÌM ĐỐI THỦ... (${data.queueCount || 1}${data.needed ? ` / ${data.needed}` : ''} trong hàng chờ)`);
         }
         break;
       }
@@ -1092,7 +1099,7 @@
         setError('lobby-error', '');
         resetConnectButton();
         statusPill('idle', 'SẴN SÀNG TÌM PHÒNG');
-        showScreen('lobby');
+        if (!isMatchmakingSearching) showScreen('lobby');
         sendMessage('CListRooms');
         addFeed(`Đã đăng nhập: ${displayName}`);
         break;
@@ -1153,9 +1160,12 @@
       case 'SPlayerLeft': {
         const gone = stringPayload(data);
         roomPlayerNames = roomPlayerNames.filter(p => p.name !== gone);
-        renderRoomPlayers(); addFeed(`${gone || 'Người chơi'} đã rời phòng.`, 'warn'); break;
+        renderRoomPlayers(); addFeed(`${gone || 'Người chơi'} đã rời phòng.`, 'warn');
+        if (screenName === 'game') showPlayerLeftNotice(gone || 'Người chơi');
+        break;
       }
       case 'SCountdown': {
+        onlineMatchEnded = false;
         const seconds = Number(Array.isArray(data) ? data[0] : data);
         const countdownSecond = Math.max(0, Math.ceil(seconds || 0));
         if (countdownSecond > 0 && lastCountdownSecond === null) startCountdownSound();
@@ -1182,8 +1192,10 @@
         rememberSnapshotTanks(latestSnapshot);
         if (mode === 'online') {
           if (!localMap) localMap = trainingMaps.get(selectedMapId) || trainingMaps.get('forest');
-          if (screenName !== 'game') {
+          if (screenName !== 'game' && !onlineMatchEnded) {
             resetMatchUi();
+            resetOnlineEvents();
+            unlockAudio();
             enterGameplayFullscreen();
             showScreen('game');
           }
@@ -1193,47 +1205,62 @@
           else if (phase === 'GameOverPhase' || phase === 'MatchOverPhase') $('phase-label').textContent = 'KẾT THÚC TRẬN';
         }
         trackSnapshot(latestSnapshot);
+        processOnlineEvents(latestSnapshot);
         break;
       }
       case 'SRoundEnd': {
         const values = Array.isArray(data) ? data : [];
-        const winner = values[0] || 'Chưa xác định';
+        const winner = String(values[0] || 'Draw');
         const scores = Array.isArray(values[1]) ? values[1] : [];
         updateScoreboard({ wsTanks: [], wsScores: scores });
-        const myTeam = onlineDraft && onlineDraft.teams && onlineDraft.teams[username];
-        const winnerTeam = onlineDraft && onlineDraft.teams && onlineDraft.teams[winner];
-        const wonRound = winner === username || (!!myTeam && winnerTeam === myTeam);
+        const snap = latestSnapshot, tanks = snap ? (readField(snap, 'wsTanks') || []) : [];
+        const meT = tanks.find(t => isMe(String(readField(t, 'tankId') || '')));
+        const myRaw = meT ? Number(readField(meT, 'tankTeam')) : -1;
+        const wT = tanks.find(t => String(readField(t, 'tankId')) === winner);
         const isDraw = winner === 'Draw';
-        const title = isDraw ? 'ROUND DRAW' : wonRound ? 'ROUND WON' : 'DEFEAT';
+        const wonRound = !isDraw && (winner === username || (!!wT && myRaw >= 0 && Number(readField(wT, 'tankTeam')) === myRaw));
+        const timeUp = snap ? Number(readField(snap, 'wsClock')) >= Number(readField(snap, 'wsClockLimit')) - 0.25 : false;
+        const ace = !isDraw && !timeUp;
+        const rNo = snap ? Number(readField(snap, 'wsRound') || 1) : 1, rMax = snap ? Number(readField(snap, 'wsRounds') || 1) : 1;
+        onlineRoundHistory.push(isDraw ? -1 : wonRound ? 0 : 1);
+        const verdict = isDraw ? `DRAW ${rNo}/${rMax}` : wonRound ? 'ROUND WON' : 'ROUND LOST';
+        const why = timeUp ? (isDraw ? 'Hết giờ, số người sống bằng nhau.' : 'Hết giờ, đội còn nhiều người sống hơn thắng.')
+          : (isDraw ? 'Hai đội cùng bị loại.' : wonRound ? 'ENEMY TEAM WIPED OUT!' : 'OUR TEAM WIPED OUT!');
         const bannerClass = isDraw ? 'round-draw' : wonRound ? 'round-win' : 'round-lose';
-        const resultText = isDraw
-          ? 'Hiệp đấu hòa. Chuẩn bị sang hiệp tiếp theo.'
-          : wonRound ? 'Bạn thắng hiệp này. Hiệp tiếp theo sẽ bắt đầu tự động.'
-            : 'Bạn thua hiệp này. Hiệp tiếp theo sẽ bắt đầu tự động.';
-        showKillBanner(title, resultText, bannerClass, 'ROUND RESULT', 2500);
+        // ACE (one team wiped the other out): same banner + voice as offline; the verdict follows 2 s later.
+        if (ace) {
+          resetAnnouncements();
+          if (wonRound) { showKillBanner('ACE', 'Đội bạn đã quét sạch phe địch!', 'ace', 'TEAM WIPE', 2300); playVoice('ace', .9, () => playKillSting(5)); }
+          else { showKillBanner('ACE', 'Phe địch đã quét sạch đội bạn!', 'ace enemy', 'TEAM WIPE', 2300); playVoice('enemyAce', .9, () => playKillSting(1, true)); }
+        }
+        setTimeout(() => { if (screenName === 'game') showKillBanner(verdict, why, bannerClass, 'ROUND RESULT', 3000); }, ace ? 2400 : 1000);
         addFeed(isDraw ? 'Hiệp đấu kết thúc với kết quả hòa.' : `${winner} thắng hiệp đấu.`);
         break;
       }
       case 'SGameOver':
       case 'SMatchOver': {
         const values = Array.isArray(data) ? data : [data];
-        const winner = values[0] || 'Chưa xác định';
+        const winner = String(values[0] || 'Chưa xác định');
         const scores = Array.isArray(values[1]) ? values[1] : [];
-        const mineTank = latestSnapshot ? findMyTank(latestSnapshot) : null;
-        const mineStats = mineTank ? tankStats(mineTank) : null;
-        const pointBoard = latestSnapshot ? scoreboardEntries(latestSnapshot).map(e => [e.id, e.points]) : [];
-        const winTeam = onlineDraft && onlineDraft.teams && onlineDraft.teams[winner];
-        const myTeamEnd = onlineDraft && onlineDraft.teams && onlineDraft.teams[username];
-        const onlineWon = winner === username || (!!myTeamEnd && winTeam === myTeamEnd);
-        playEndSfx(onlineWon, .62);
-        showEndSplash(onlineWon ? 'win' : 'lose', () => showPostMatch({
-          title: onlineWon ? 'CHIẾN THẮNG' : 'TRẬN ĐẤU KẾT THÚC',
-          summary: `${winner} là người chiến thắng chung cuộc.`,
-          kills: mineStats ? mineStats.kills : 0, score: mineStats ? mineStats.points : 0,
+        matchPointActive = false;
+        onlineMatchEnded = true;
+        const rep = buildOnlineReport(winner);
+        const won = rep.outcome === 'win';
+        setMovementSound(false); stopShotSounds();
+        playEndSfx(won, .66, rep.report.team);
+        showEndSplash(rep.outcome, () => showPostMatch({
+          title: rep.outcome === 'win' ? 'VICTORY' : rep.outcome === 'lose' ? 'DEFEAT' : 'DRAW',
+          kills: rep.me ? rep.me.kills : 0, score: rep.me ? rep.me.points : 0,
           map: (localMap && localMap.label) || 'CHIẾN TRƯỜNG',
-          scores: pointBoard.length ? pointBoard : scores
+          scores: rep.players.length ? rep.players.slice().sort((x, y) => y.points - x.points).map(pl => [pl.name, pl.points]) : scores,
+          players: rep.players, report: rep.report
         }));
         addFeed(`Chiến thắng chung cuộc: ${winner}`, 'warn'); break;
+      }
+      case 'SChat': {
+        const c = Array.isArray(data) ? data : [];
+        addChatLine(String(c[0] || ''), String(c[1] || ''), !!c[2]);
+        break;
       }
       case 'SKillEvent': {
         // Current protocol: [killer, victim]. Optional extra fields from a newer backend:
@@ -1244,16 +1271,217 @@
       }
       case 'SMysteryBoxPickup': {
         const pair = Array.isArray(data) ? data : [];
-        queueOnlineBoxEffects(String(pair[0] || ''), String(pair[1] || 'NormalBullet'));
+        const who = String(pair[0] || ''), reward = String(pair[1] || 'NormalBullet');
+        queueOnlineBoxEffects(who, reward);
         playSfx('pickup', .52);
-        addFeed(`${pair[0] || 'Người chơi'} nhặt hộp: ${weaponName(pair[1])}.`); break;
+        const name = who || 'Người chơi';
+        const text = reward === 'shield' ? `${name}: Khiên bất tử trong 5 giây!`
+          : reward === 'power' ? `${name}: Tăng tốc chạy và bắn trong 3 giây!`
+            : reward === 'bomb' ? `${name}: BOM! Xe bị phá huỷ.`
+              : reward === 'revive' ? `${name}: Đã hồi sinh một đồng đội!`
+                : `${name} nhặt hộp: ${weaponName(reward)}.`;
+        if (reward === 'bomb') playSfx('explosion', .55 * SFX_MIX.explosion);
+        addFeed(`Mystery Box · ${text}`, reward === 'bomb' ? 'warn' : ''); break;
       }
       case 'SLeaderboard':
         addFeed('Đã nhận bảng xếp hạng.'); break;
-      case 'SPong': break;
+      case 'SPong': showPing(performance.now() - pingSentAt); break;
       case 'SError': addFeed(stringPayload(data) || 'Lỗi server.', 'warn'); break;
       default: break;
     }
+  }
+
+  // ---------------------------------------------------------------- ping + history
+  let pingSentAt = 0;
+  function showPing(ms) {
+    if (!(ms >= 0) || ms > 5000) return;
+    let badge = $('ping-badge');
+    if (!badge) {
+      badge = document.createElement('div'); badge.id = 'ping-badge';
+      badge.style.cssText = 'position:fixed;top:8px;right:10px;z-index:70;padding:3px 9px;border-radius:5px;background:rgba(8,12,8,.7);font:700 12px monospace;pointer-events:none';
+      document.body.append(badge);
+    }
+    const v = Math.round(ms);
+    badge.textContent = `PING ${v} ms`;
+    badge.style.color = v < 80 ? '#8ae65e' : v < 160 ? '#ffd45d' : '#ff655d';
+    badge.hidden = !(mode === 'online' && (screenName === 'game' || screenName === 'room'));
+  }
+  window.setInterval(() => {
+    if (mode === 'online' && ws && ws.readyState === WebSocket.OPEN && loggedIn) { pingSentAt = performance.now(); sendMessage('CPing'); }
+  }, 2000);
+
+  function ensureHistoryButton() {
+    let btn = $('history-button');
+    if (!btn) {
+      btn = document.createElement('button'); btn.id = 'history-button'; btn.type = 'button'; btn.textContent = '🕘 LỊCH SỬ ĐẤU';
+      btn.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:55;padding:9px 14px;border-radius:6px;border:1px solid rgba(199,243,107,.6);background:rgba(10,16,10,.88);color:#e8f0df;font:700 13px sans-serif;letter-spacing:.05em;cursor:pointer';
+      btn.addEventListener('click', () => { if (!sendMessage('CRequestHistory')) renderHistory([]); });
+      document.body.append(btn);
+    }
+    btn.hidden = !(loggedIn && (screenName === 'lobby' || screenName === 'room'));
+  }
+
+  document.addEventListener('keydown', e => { const p = document.getElementById('history-panel'); if (e.key === 'Escape' && p) p.style.display = 'none'; });
+
+  function renderHistory(records) {
+    let panel = $('history-panel');
+    if (!panel) {
+      panel = document.createElement('div'); panel.id = 'history-panel';
+      panel.style.cssText = 'position:fixed;inset:0;z-index:90;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center';
+      panel.addEventListener('click', e => { if (e.target === panel) panel.style.display = 'none'; });
+      document.body.append(panel);
+    }
+    panel.style.display = 'flex'; panel.innerHTML = '';
+    const box = document.createElement('div');
+    box.style.cssText = 'width:min(640px,94vw);max-height:84vh;overflow:auto;padding:18px 20px;border-radius:10px;background:#0e150e;border:1px solid rgba(199,243,107,.5);color:#e8f0df;font:14px sans-serif';
+    const head = document.createElement('div'); head.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:12px';
+    head.innerHTML = '<strong style="letter-spacing:.08em">LỊCH SỬ ĐẤU</strong>';
+    const close = document.createElement('button'); close.textContent = '✕'; close.style.cssText = 'background:none;border:0;color:#e8f0df;font-size:18px;cursor:pointer';
+    close.addEventListener('click', () => { panel.style.display = 'none'; }); head.append(close); box.append(head);
+    if (!records.length) {
+      const empty = document.createElement('div'); empty.style.opacity = '.7'; empty.textContent = 'Chưa có trận online nào được ghi lại.'; box.append(empty);
+    }
+    records.forEach(rec => {
+      const players = (readField(rec, 'mrPlayers') || []).map(pl => ({ name: String(readField(pl, 'mprUsername')), score: Number(readField(pl, 'mprScore') || 0), kills: Number(readField(pl, 'mprKills') || 0) }));
+      players.sort((x, y) => y.score - x.score);
+      const winner = String(readField(rec, 'mrWinner') || '');
+      const meIdx = players.findIndex(pl => pl.name === username);
+      const me = meIdx >= 0 ? players[meIdx] : null;
+      const won = winner === username;
+      let when = String(readField(rec, 'mrEndTime') || readField(rec, 'mrStartTime') || '');
+      const d = new Date(when); if (!isNaN(d)) when = d.toLocaleString('vi-VN');
+      const row = document.createElement('div');
+      row.style.cssText = `margin:8px 0;padding:10px 12px;border-radius:7px;background:rgba(255,255,255,.05);border-left:4px solid ${won ? '#8ae65e' : '#ff655d'}`;
+      const top = document.createElement('div'); top.style.cssText = 'display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap';
+      top.innerHTML = `<strong>${won ? 'THẮNG' : 'THUA'} · Phòng ${readField(rec, 'mrRoomId') || '------'}</strong>`;
+      const t = document.createElement('span'); t.style.opacity = '.7'; t.textContent = when; top.append(t);
+      const mid = document.createElement('div'); mid.style.cssText = 'margin-top:4px;opacity:.9';
+      mid.textContent = `Người thắng: ${winner || '—'} · ${readField(rec, 'mrRoundsPlayed') || 1} ván` + (me ? ` · Bạn: hạng ${meIdx + 1}/${players.length}, ${me.kills} hạ, ${me.score} điểm` : '');
+      const list = document.createElement('div'); list.style.cssText = 'margin-top:4px;font-size:12px;opacity:.7';
+      list.textContent = players.map(pl => `${pl.name} (${pl.kills}/${pl.score})`).join(' · ');
+      row.append(top, mid, list); box.append(row);
+    });
+    panel.append(box);
+  }
+
+  // ---------------------------------------------------------------- online parity helpers
+  // Everything below makes online matches behave like offline ones: same announcements, match point, zone
+  // banners, shot sounds, results report and "player left" notice. All of it is driven by server snapshots.
+  let onlinePrev = null, onlineRoundHistory = [];
+  function resetOnlineEvents() {
+    onlinePrev = { phase: '', ammo: {}, zoneOpen: false, openVoice: false, rate50: false, shown70: [false, false], overtime: false };
+    onlineRoundHistory = [];
+  }
+
+  function processOnlineEvents(snap) {
+    if (mode !== 'online' || !snap) return;
+    if (!onlinePrev) resetOnlineEvents();
+    const prev = onlinePrev;
+    const phase = tagOf(readField(snap, 'wsPhase'));
+    const hg = hudGame();
+    const tanks = readField(snap, 'wsTanks') || [];
+    // Shot sounds: a tank whose magazine count dropped just fired.
+    tanks.forEach(t => {
+      const st = tankStats(t), before = prev.ammo[st.id];
+      if (st.alive && before !== undefined && st.ammo < before && phase === 'InGamePhase') {
+        const weapon = readField(readField(t, 'tankWeapon') || {}, 'wsCurrentWeapon') || 'NormalBullet';
+        const volume = (isMe(st.id) ? .43 : .16) * SFX_MIX.shot;
+        if (weapon === 'LaserBullet') playShot('laserShot', volume);
+        else if (weapon === 'GatlingBullet') playShot('gatlingShot', volume);
+        else if (weapon === 'WallPiercingBullet') playShot('piercingShot', volume);
+        else playSfx('normalShot', volume);
+      }
+      prev.ammo[st.id] = st.ammo;
+    });
+    // A new round / match starts fighting: fresh First Blood, no leftover announcements, match point notice.
+    if (phase === 'InGamePhase' && prev.phase !== 'InGamePhase') {
+      resetAnnouncements();
+      firstBloodDone = false;
+      killTracker.clear(); streakTracker.clear(); lastKnownStreak.clear();
+      lastKillerOfMe = '';
+      const feed = $('kill-feed'); if (feed) feed.innerHTML = '';
+      if (hg && hg.team && !hg.zone) {
+        const need = Math.floor(hg.rounds / 2) + 1;
+        const atPoint = need >= 2 ? [0, 1].filter(t => hg.wins[t] === need - 1) : [];
+        if (atPoint.length) {
+          const who = atPoint.length === 2 ? 'Cả hai đội chỉ còn cách chiến thắng 1 ván' : atPoint[0] === 0 ? 'Đội bạn chỉ còn cách chiến thắng 1 ván' : 'Đội địch chỉ còn cách chiến thắng 1 ván';
+          matchPointTrack = pickMatchPointTrack(); matchPointActive = !!matchPointTrack;
+          queueAnnouncement({ banner: ['MATCH POINT', who, 'matchpoint', `ROUND ${hg.round}/${hg.rounds}`, 3200] });
+          runAnnouncements();
+        } else {
+          matchPointActive = false;
+          showKillBanner(`ROUND ${hg.round}/${hg.rounds}`, 'Bắt đầu!', 'round-start', 'ROUND START', 2200);
+        }
+        syncMusicForScreen();
+      }
+    }
+    // Control zone announcements (same texts / sounds as the offline zone).
+    const z = hg && hg.zone;
+    if (z && phase === 'InGamePhase') {
+      if (!prev.openVoice) { prev.openVoice = true; playSfx('zoneOpenVoice', 1); }
+      if (z.open && !prev.zoneOpen) {
+        prev.zoneOpen = true;
+        playSfx('zoneStartVoice', 1);
+        showKillBanner('CONTROL ZONE OPEN', 'Chiếm vùng trung tâm để tăng tiến trình!', 'round-start', 'CẤM ĐỊA', 3200);
+        addFeed('Control zone đã mở!');
+      }
+      const top = Math.max(z.progress[0], z.progress[1]);
+      if (!prev.rate50 && top >= 50) { prev.rate50 = true; playSfx('rateIncrease', 1); }
+      [0, 1].forEach(t => {
+        if (z.progress[t] < RULES.zoneMusicAt || prev.shown70[t]) return;
+        prev.shown70[t] = true;
+        const mine = t === 0;
+        showKillBanner(mine ? 'SẮP THẮNG RỒI, CỐ LÊN!' : 'CHƯA THUA ĐÂU, GẮNG LÊN!', mine ? `Đội bạn đã chiếm ${RULES.zoneMusicAt}% vùng` : `Đội địch đã chiếm ${RULES.zoneMusicAt}% vùng`, mine ? 'zone-hope' : 'zone-fight', 'CẤM ĐỊA', 3200);
+      });
+      if (top >= RULES.zoneMusicAt && !zoneBoostBroken && !zoneBoostActive) { zoneBoostActive = true; syncMusicForScreen(); }
+      if (z.overtime && !prev.overtime) {
+        prev.overtime = true;
+        showKillBanner('TRANH ĐOẠT', `Áp đảo số xe trong vùng ${RULES.zoneContestSeconds} giây liên tục để thắng!`, 'matchpoint', 'ZONE CONTEST', 3400);
+      }
+    }
+    prev.phase = phase;
+  }
+
+  // Players / outcome for the LoL-style results screen. Teams are flipped so that my team is always 0 (blue).
+  function buildOnlineReport(winner) {
+    const snap = latestSnapshot, tanks = snap ? (readField(snap, 'wsTanks') || []) : [];
+    const teamed = !!snap && String(readField(snap, 'wsMode') || 'deathmatch') !== 'deathmatch';
+    const meRaw = tanks.find(t => isMe(String(readField(t, 'tankId') || '')));
+    const myRaw = meRaw ? Number(readField(meRaw, 'tankTeam')) : 0;
+    const flip = teamed && myRaw === 1;
+    const mapTeam = v => (!teamed ? -1 : (flip ? 1 - v : v));
+    const players = tanks.map(t => {
+      const st = tankStats(t);
+      return { name: st.id, team: mapTeam(st.team), kills: st.kills, deaths: st.deaths, points: st.points, me: isMe(st.id), color: COLORS[st.color] || '#c7f36b' };
+    });
+    const me = players.find(pl => pl.me) || null;
+    const wT = tanks.find(t => String(readField(t, 'tankId')) === winner);
+    let outcome;
+    if (winner === 'Draw') outcome = 'draw';
+    else if (teamed) outcome = wT && Number(readField(wT, 'tankTeam')) === myRaw ? 'win' : 'lose';
+    else outcome = winner === username || winner === displayName ? 'win' : 'lose';
+    const report = { team: teamed, myTeam: 0, outcome };
+    if (teamed) {
+      const hg = hudGame();
+      report.wins = hg ? hg.wins : [0, 0];
+      report.history = onlineRoundHistory.slice();
+      if (hg && hg.zone) report.zone = { progress: hg.zone.progress.slice() };
+    }
+    return { players, me, outcome, report };
+  }
+
+  // One-line notice when somebody leaves mid-match; the server turns their tank into a bot.
+  function showPlayerLeftNotice(name) {
+    let box = $('player-left-notice');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'player-left-notice';
+      box.style.cssText = 'position:fixed;top:84px;left:50%;transform:translateX(-50%);z-index:60;padding:8px 18px;border-radius:6px;background:rgba(10,16,10,.82);border:1px solid rgba(255,202,115,.7);color:#ffe9b0;font:700 14px sans-serif;letter-spacing:.04em;pointer-events:none;text-align:center';
+      document.body.append(box);
+    }
+    box.textContent = `${name} đã thoát phòng · Bot tiếp quản xe của họ`;
+    box.hidden = false;
+    clearTimeout(box._timer);
+    box._timer = setTimeout(() => { box.hidden = true; }, 4500);
   }
 
   // ---------------------------------------------------------------- results
@@ -1368,6 +1596,20 @@
     setMovementSound(false);
     leaveGameplayFullscreen();
     const wasOnline = mode === 'online';
+    // Online: giữ nguyên phòng, quay về phòng chờ để chủ phòng bắt đầu ván mới với cùng những người chơi.
+    if (wasOnline && ws && ws.readyState === WebSocket.OPEN && loggedIn && activeRoom) {
+      stopInputSender(); stopShotSounds();
+      hideOverlay(); hidePauseModal();
+      resetMatchUi();
+      localGame = null; localMap = null; latestSnapshot = null;
+      onlineMatchEnded = true;
+      if (onlineDraft) { onlineDraft.stage = 'lobby'; onlineDraft.votes = {}; onlineDraft.teams = {}; }
+      setError('room-error', '');
+      showScreen('room');
+      renderRoomPlayers();
+      addFeed('Đã quay lại phòng đấu.');
+      return;
+    }
     localGame = null;
     localMap = null;
     if (wasOnline && ws && ws.readyState === WebSocket.OPEN && loggedIn) {
@@ -1396,6 +1638,7 @@
       votes: {}, teams: {}, stage: 'lobby'
     };
     $('room-code').textContent = readField(activeRoom, 'riRoomId') || '------';
+    addFeed(`Mã phòng: ${readField(activeRoom, 'riRoomId') || '------'}`);
     $('room-caption').textContent = isHost ? 'Bạn là chủ phòng. Chờ bạn bè tham gia.' : 'Bạn đã tham gia phòng. Chờ chủ phòng bắt đầu.';
     $('countdown-banner').hidden = true;
     setError('room-error', '');
@@ -1531,13 +1774,15 @@
       if (player.host || (isHost && player.self)) { const host = document.createElement('span'); host.className = 'host-label'; host.textContent = 'CHỦ PHÒNG'; row.append(host); }
       root.append(row);
     });
-    $('start-button').disabled = !isHost || currentCount < 2;
+    const needFull = (readField(activeRoom, 'riGameMode') || 'deathmatch') !== 'deathmatch';
+    const needed = needFull ? max : 2;
+    $('start-button').disabled = !isHost || currentCount < needed;
     $('start-button').textContent = !isHost
       ? 'CHỜ CHỦ PHÒNG'
-      : currentCount < 2 ? 'CHỜ NGƯỜI CHƠI THỨ 2' : '▶ BẮT ĐẦU TRẬN';
+      : currentCount < needed ? (needFull ? `CẦN ĐỦ ${max} NGƯỜI (${currentCount}/${max})` : 'CHỜ NGƯỜI CHƠI') : '▶ BẮT ĐẦU TRẬN';
     $('start-button').title = !isHost
       ? 'Chỉ chủ phòng mới bắt đầu được'
-      : currentCount < 2 ? 'Cần ít nhất 2 người chơi để bắt đầu' : 'Bắt đầu trận đấu';
+      : currentCount < needed ? (needFull ? `Đấu đội / Cấm địa phải đủ ${max} người mới bắt đầu` : 'Cần ít nhất 2 người chơi để bắt đầu') : 'Bắt đầu trận đấu';
   }
 
   function createRoom() {
@@ -1604,9 +1849,9 @@
     const size = botSettings.teamSize || 2;
 
     let modeName = 'TỬ CHIẾN';
-    let badgeText = 'GHÉP PHÒNG TỬ CHIẾN (1V1)';
-    let needed = 2;
-    let subtext = 'Hàng chờ 1v1 PvP ngẫu nhiên. Cần 2 người chơi.';
+    let badgeText = 'GHÉP PHÒNG TỬ CHIẾN (1 ĐẤU 8)';
+    let needed = 4;
+    let subtext = 'Tử chiến tự do: từ 4 người là có thể bắt đầu, tối đa 9 người (1 đấu 8).';
 
     if (isZone) {
       modeName = `CẤM ĐỊA ${size}V${size}`;
@@ -1657,14 +1902,10 @@
 
   function startMatchmaking(preferredMap) {
     unlockAudio();
-    // Server hiện chưa hỗ trợ ghép trận tự động (CStartMatchmaking không tồn tại
-    // trong Common.Protocol). Báo rõ thay vì quay vòng mãi mãi.
-    setError('map-error', 'Ghép trận tự động chưa được server hỗ trợ. Hãy dùng ĐĂNG NHẬP ONLINE rồi tạo/vào phòng.');
-    cancelMatchmaking();
-    return;
+    startMatchmakingImpl(preferredMap);
   }
 
-  function startMatchmakingUnsupported(preferredMap) {
+  function startMatchmakingImpl(preferredMap) {
     const isZone = botSettings.zone && botSettings.teamSize >= 2;
     const isTeam = !isZone && botSettings.teamSize >= 2;
     const size = botSettings.teamSize || 0;
@@ -1677,7 +1918,7 @@
     const radar = $('mm-radar');
     if (radar) radar.classList.add('searching');
     setText('mm-status-text', 'ĐANG TÌM ĐỐI THỦ...');
-    const modeDesc = isZone ? `Cấm Địa ${size}v${size}` : (isTeam ? `Đấu Đội ${size}v${size}` : 'Tử Chiến 1v1');
+    const modeDesc = isZone ? `Cấm Địa ${size}v${size}` : (isTeam ? `Đấu Đội ${size}v${size}` : 'Tử Chiến (từ 4 người, tối đa 9)');
     setText('mm-subtext', `Chế độ: ${modeDesc} • Bản đồ: ${MAP_LABELS[actualMap] || actualMap.toUpperCase()}`);
     const timerEl = $('mm-timer');
     if (timerEl) {
@@ -1701,12 +1942,10 @@
 
     ensureMatchmakingSocket(() => {
       sendMessage('CStartMatchmaking', {
-        name: username || displayName || $('tank-name').value.trim() || 'TankPilot',
-        mode: modeTag,
-        teamSize: size,
-        preferredMap: actualMap,
-        hull: selectedHullId,
-        gun: selectedGunId
+        csmMode: modeTag,
+        csmTeamSize: modeTag === 'deathmatch' ? 0 : size,
+        csmHull: String(selectedHullId).padStart(2, '0'),
+        csmGun: String(selectedGunId).padStart(2, '0')
       });
     });
   }
@@ -1805,7 +2044,11 @@ function chooseOfflineMap(mapId) {
 
   // ---------------------------------------------------------------- online map vote
 
-  const MAP_LABELS = { forest: 'FOREST', ruins: 'RUINS', depot: 'DEPOT', random: 'NGẪU NHIÊN' };
+  const MAP_LABELS = { forest: 'FOREST', ruins: 'RUINS', depot: 'DEPOT', camdia: 'CẤM ĐỊA', random: 'NGẪU NHIÊN' };
+
+  function isOnlineZoneRoom() {
+    return !!activeRoom && readField(activeRoom, 'riGameMode') === 'zone';
+  }
 
   function updateOnlineDraft(payload) {
     const draft = payload && typeof payload === 'object' ? payload : {};
@@ -1822,6 +2065,10 @@ function chooseOfflineMap(mapId) {
       teams: draft.teams && typeof draft.teams === 'object' ? draft.teams : {},
       stage: draft.stage || 'lobby'
     };
+    // Cấm Địa has a single map: every player counts as having chosen it, whatever the network timing.
+    if (isOnlineZoneRoom()) {
+      onlineDraft.votes = Object.fromEntries(onlineDraft.players.map(player => [player, 'camdia']));
+    }
     if (mapSelectMode === 'online') renderOnlineMatchSetup();
   }
 
@@ -1832,14 +2079,16 @@ function chooseOfflineMap(mapId) {
     $('online-match-setup').hidden = !online;
     if (online) {
       const teamMode = onlineDraft.mode === 'teams';
-      setText('map-settings-title', teamMode ? 'CHỌN PHE' : 'BỎ PHIẾU BẢN ĐỒ');
-      setText('map-settings-subtitle', teamMode ? 'Chọn phe và xem phiếu của cả phòng.' : 'Bỏ phiếu bản đồ cùng mọi người trong phòng.');
+      const zoneRoom = (activeRoom && readField(activeRoom, 'riGameMode')) === 'zone';
+      setText('map-settings-title', zoneRoom ? 'CẤM ĐỊA' : teamMode ? 'CHỌN PHE' : 'BỎ PHIẾU BẢN ĐỒ');
+      setText('map-settings-subtitle', zoneRoom ? 'Cấm Địa chỉ có một bản đồ duy nhất, chọn phe rồi bắt đầu.' : teamMode ? 'Chọn phe và xem phiếu của cả phòng.' : 'Bỏ phiếu bản đồ cùng mọi người trong phòng.');
       document.querySelectorAll('[data-map]').forEach(button => {
-        button.hidden = button.dataset.map === 'camdia';
+        // Cấm Địa has exactly one map; every other online mode votes between the three normal maps.
+        button.hidden = zoneRoom ? button.dataset.map !== 'camdia' : button.dataset.map === 'camdia';
         button.classList.toggle('active', onlineDraft.votes[username] === button.dataset.map);
       });
       const heading = document.querySelector('.map-picker-heading');
-      if (heading) heading.textContent = 'BỎ PHIẾU CHIẾN TRƯỜNG';
+      if (heading) heading.textContent = zoneRoom ? 'BẢN ĐỒ CẤM ĐỊA' : 'BỎ PHIẾU CHIẾN TRƯỜNG';
     } else {
       setMatchCategory(matchCategory || 'bot');
     }
@@ -1852,6 +2101,11 @@ function chooseOfflineMap(mapId) {
     mapSelectMode = 'online';
     setError('map-error', '');
     setOnlineMapUi(true);
+    // Cấm Địa: the only map is voted automatically so nobody has to pick it.
+    if (activeRoom && readField(activeRoom, 'riGameMode') === 'zone' && onlineDraft.votes[username] !== 'camdia') {
+      onlineDraft.votes = { ...onlineDraft.votes, [username]: 'camdia' };
+      sendMessage('CMapVote', { cmvMapId: 'camdia' });
+    }
     renderOnlineMatchSetup();
     showScreen('map');
   }
@@ -1868,7 +2122,7 @@ function chooseOfflineMap(mapId) {
   function getOnlineDraftReadiness(players) {
     const activePlayers = players.filter(Boolean);
     const missing = activePlayers.filter(player => {
-      const voted = Object.prototype.hasOwnProperty.call(onlineDraft.votes, player);
+      const voted = isOnlineZoneRoom() || Object.prototype.hasOwnProperty.call(onlineDraft.votes, player);
       const choseTeam = onlineDraft.teams[player] === 'blue' || onlineDraft.teams[player] === 'red';
       return !voted || (onlineDraft.mode === 'teams' && !choseTeam);
     });
@@ -1885,7 +2139,7 @@ function chooseOfflineMap(mapId) {
     const slotCount = Math.max(players.length, Math.min(10, onlineDraft.maxPlayers || 2));
     for (let index = 0; index < slotCount; index += 1) {
       const player = players[index] || '';
-      const vote = player ? onlineDraft.votes[player] : '';
+      const vote = player ? (isOnlineZoneRoom() ? 'camdia' : onlineDraft.votes[player]) : '';
       const row = document.createElement('div');
       row.className = `online-player-vote${player === username ? ' self' : ''}${!player ? ' waiting' : ''}`;
       row.innerHTML = `<b>${String(index + 1).padStart(2, '0')}</b><span>${player || 'ĐANG CHỜ'}</span><small>${vote ? MAP_LABELS[vote] : 'CHƯA CHỌN'}</small>`;
@@ -1896,8 +2150,9 @@ function chooseOfflineMap(mapId) {
     renderOnlineTeamRow('online-team-blue', 'blue', players);
     renderOnlineTeamRow('online-team-red', 'red', players);
     const readiness = getOnlineDraftReadiness(players);
-    const counts = { forest: 0, ruins: 0, depot: 0, random: 0 };
-    Object.values(onlineDraft.votes).forEach(vote => { if (Object.prototype.hasOwnProperty.call(counts, vote)) counts[vote] += 1; });
+    const counts = { forest: 0, ruins: 0, depot: 0, camdia: 0, random: 0 };
+    if (isOnlineZoneRoom()) counts.camdia = players.filter(Boolean).length;
+    else Object.values(onlineDraft.votes).forEach(vote => { if (Object.prototype.hasOwnProperty.call(counts, vote)) counts[vote] += 1; });
     const choices = Object.entries(counts).filter(([, count]) => count > 0);
     let leader = readiness.playerCount < 2
       ? 'CẦN ÍT NHẤT 2 NGƯỜI CHƠI ĐỂ BẮT ĐẦU'
@@ -3289,6 +3544,10 @@ function chooseOfflineMap(mapId) {
     if (localGame && localGame.team) {
       return localGame.tanks.some(mate => mate.tankAlive && mate.team === observer.team && distance(mate.tankPos, targetPos) <= visionRadius());
     }
+    if (mode === 'online' && latestSnapshot && Number(readField(observer, 'tankTeam')) >= 0) {
+      const team = Number(readField(observer, 'tankTeam'));
+      return (readField(latestSnapshot, 'wsTanks') || []).some(mate => readField(mate, 'tankAlive') !== false && Number(readField(mate, 'tankTeam')) === team && readField(mate, 'tankPos') && distance(readField(mate, 'tankPos'), targetPos) <= visionRadius());
+    }
     return distance(observerPos, targetPos) <= visionRadius();
   }
 
@@ -3308,7 +3567,8 @@ function chooseOfflineMap(mapId) {
       const myTank = findMyTank(latestSnapshot);
       if (myTank && readField(myTank, 'tankAlive') !== false) return myTank;
       const aliveTanks = (readField(latestSnapshot, 'wsTanks') || []).filter(t => readField(t, 'tankAlive') !== false);
-      return aliveTanks[0] || myTank || null;
+      const myTeam = myTank ? Number(readField(myTank, 'tankTeam')) : -1;
+      return (myTeam >= 0 && aliveTanks.find(t => Number(readField(t, 'tankTeam')) === myTeam)) || aliveTanks[0] || myTank || null;
     }
     return null;
   }
@@ -3342,7 +3602,7 @@ function chooseOfflineMap(mapId) {
     const pos = readField(tank, 'tankPos'); if (!pos) return;
     const screen = localToScreen({ vx: Number(readField(pos, 'vx') || 0), vy: Number(readField(pos, 'vy') || 0) });
     const x = screen.x, y = screen.y;
-    const color = COLORS[readField(tank, 'tankColor')] || '#8ae65e';
+    const color = COLORS[teamColorFor(tank, readField(tank, 'tankColor'))] || '#8ae65e';
     const bodyAngle = Number(readField(tank, 'tankBodyAngle') || 0);
     const turretAngle = Number(readField(tank, 'tankTurretAngle') || 0);
     const size = localMap.tankSize * localMap.tankScale * Number(TEST_GAME.tankRenderScale || .5) * localWorldScale();
@@ -3633,7 +3893,8 @@ function chooseOfflineMap(mapId) {
     const point = { vx: Number(readField(pos, 'vx') || 0), vy: Number(readField(pos, 'vy') || 0) };
     const expires = performance.now() + 2000;
     onlineEffects.push({ kind: 'boxBroken', pos: point, owner: '', reward: '', expires, duration: 2000 });
-    onlineEffects.push({ kind: 'weapon', pos: point, owner: picker, reward, expires, duration: 2000 });
+    const weaponReward = ['ShotgunBullet', 'LaserBullet', 'WallPiercingBullet', 'GatlingBullet'].includes(reward);
+    onlineEffects.push({ kind: weaponReward ? 'weapon' : 'reward', pos: point, owner: picker, reward, expires, duration: 2000 });
   }
 
   function drawOnlineEffects(height) {
@@ -3659,13 +3920,23 @@ function chooseOfflineMap(mapId) {
     if (mode === 'online' && activeRoom) $('match-room').textContent = readField(activeRoom, 'riRoomId') || 'ONLINE';
   }
   // Normalises a Tank (server snapshot or local simulation) into plain numbers for the HUD.
+  function teamColorFor(tank, fallback) {
+    if (mode !== 'online' || !latestSnapshot) return fallback;
+    if (String(readField(latestSnapshot, 'wsMode') || 'deathmatch') === 'deathmatch') return fallback;
+    const team = Number(readField(tank, 'tankTeam'));
+    if (!(team >= 0)) return fallback;
+    const me = (readField(latestSnapshot, 'wsTanks') || []).find(t => isMe(String(readField(t, 'tankId') || '')));
+    if (!me || !(Number(readField(me, 'tankTeam')) >= 0)) return fallback;
+    return Number(readField(me, 'tankTeam')) === team ? 'TankBlue' : 'TankRed';
+  }
+
   function tankStats(tank) {
     const num = (key, fallback = 0) => { const v = Number(readField(tank, key)); return Number.isFinite(v) ? v : fallback; };
     const kills = num('tankKills');
     const hasPoints = readField(tank, 'tankPoints') !== undefined;
     return {
       id: String(readField(tank, 'tankId') || 'PLAYER'),
-      color: readField(tank, 'tankColor') || 'TankGreen',
+      color: teamColorFor(tank, readField(tank, 'tankColor') || 'TankGreen'),
       alive: readField(tank, 'tankAlive') !== false,
       kills, deaths: num('tankDeaths'),
       points: hasPoints ? num('tankPoints') : kills,
@@ -3843,7 +4114,7 @@ function chooseOfflineMap(mapId) {
   function colorOfTank(name) {
     const tanks = latestSnapshot ? (readField(latestSnapshot, 'wsTanks') || []) : [];
     const tank = tanks.find(t => readField(t, 'tankId') === name);
-    return COLORS[tank ? readField(tank, 'tankColor') : ''] || '#e8f0df';
+    return COLORS[tank ? teamColorFor(tank, readField(tank, 'tankColor')) : ''] || '#e8f0df';
   }
 
   function parseTier(value) {
@@ -3888,6 +4159,11 @@ function chooseOfflineMap(mapId) {
       const tank = localGame.tanks.find(t => t.tankId === name);
       if (tank && tank.team === localGame.tanks[0].team) return 'ally';
     }
+    if (mode === 'online' && latestSnapshot) {
+      const ts = readField(latestSnapshot, 'wsTanks') || [];
+      const a = ts.find(t => String(readField(t, 'tankId')) === name), b = ts.find(t => isMe(String(readField(t, 'tankId'))));
+      if (a && b && Number(readField(b, 'tankTeam')) >= 0) return Number(readField(a, 'tankTeam')) === Number(readField(b, 'tankTeam')) ? 'ally' : 'enemy';
+    }
     if (mode === 'online' && onlineDraft && onlineDraft.teams && onlineDraft.teams[username]) {
       const myTeam = onlineDraft.teams[username];
       if (onlineDraft.teams[name] === myTeam) return 'ally';
@@ -3926,7 +4202,7 @@ function chooseOfflineMap(mapId) {
     if (tier >= 2) queueAnnouncement({ banner: [tag(MULTI_TITLES[tier]), `${who} đã hạ ${victim}`, `multi-${tier}${enemy ? ' enemy' : ''}`, 'MULTI KILL', tier >= 5 ? 3600 : 2800], voice: voiceKey(MULTI_SOUNDS[tier], enemy), vol, fallback: () => playKillSting(tier) });
     else if (streakTier) queueAnnouncement({ banner: [tag(STREAK_TITLES[streakTier]), `${who} đã hạ ${victim} · chuỗi ${streak} mạng`, `streak-${streakTier}${enemy ? ' enemy' : ''}`, 'KILLING SPREE', streakTier >= 7 ? 3400 : 2800], voice: voiceKey(STREAK_SOUNDS[streakTier], enemy), vol, fallback: () => playKillSting(Math.min(5, streakTier)) });
     if (shutdown) queueAnnouncement({ banner: ['SHUTDOWN', `${who} đã chấm dứt chuỗi của ${victim} · +${RULES.shutdownBonus}`, `shutdown${enemy ? ' enemy' : ''}`, 'SHUTDOWN', 2800], voice: 'shutdown', vol, fallback: () => playKillSting(1, true) });
-    const teamVoices = mode === 'offline' && !!localGame && !!localGame.team;
+    const teamVoices = (mode === 'offline' && !!localGame && !!localGame.team) || (mode === 'online' && !!(hudGame() && hudGame().team));
     if (!special && teamVoices) {
       // Team modes: the voice depends on which side scored. The banner for my own kill is unchanged.
       const ourSideScored = killerSide !== 'enemy';
@@ -4011,6 +4287,8 @@ function chooseOfflineMap(mapId) {
     return { w: WORLD_W, h: WORLD_H };
   }
 
+  let lastInputSig = '', lastInputSentAt = 0;
+
   function updateCurrentInput() {
     if (mode !== 'online' || !wsReady || !loggedIn || screenName !== 'game') return;
     const snapshot = latestSnapshot; if (!snapshot) return;
@@ -4021,11 +4299,16 @@ function chooseOfflineMap(mapId) {
       ? screenToLocalWorld(input.mouseX, input.mouseY)
       : { vx: input.mouseX, vy: input.mouseY };
     const angle = Math.atan2(pointer.vy - Number(readField(pos, 'vy') || 0), pointer.vx - Number(readField(pos, 'vx') || 0));
-    sendMessage('CPlayerInput', { piMoveUp: input.up, piMoveDown: input.down, piMoveLeft: input.left, piMoveRight: input.right, piMouseAngle: angle, piFire: input.fire, piReload: input.reloadPulse });
+    const qAngle = Math.round(angle / 0.02) * 0.02;   // quantised: no packet for sub-degree wiggles
+    const sig = `${+input.up}${+input.down}${+input.left}${+input.right}${+input.fire}${+input.reloadPulse}|${qAngle.toFixed(2)}`;
+    const nowMs = performance.now();
+    if (sig === lastInputSig && nowMs - lastInputSentAt < 100) return;
+    lastInputSig = sig; lastInputSentAt = nowMs;
+    sendMessage('CPlayerInput', { piMoveUp: input.up, piMoveDown: input.down, piMoveLeft: input.left, piMoveRight: input.right, piMouseAngle: qAngle, piFire: input.fire, piReload: input.reloadPulse });
     input.reloadPulse = false;
   }
 
-  function startInputSender() { stopInputSender(); inputTimer = window.setInterval(updateCurrentInput, 1000 / 30); }
+  function startInputSender() { stopInputSender(); inputTimer = window.setInterval(updateCurrentInput, 1000 / 60); }
   function stopInputSender() { if (inputTimer !== null) { clearInterval(inputTimer); inputTimer = null; } }
 
   function setKey(key, pressed) {
@@ -4053,6 +4336,10 @@ function chooseOfflineMap(mapId) {
     if (screenName !== 'game') return;
     if (e.key === 'Tab') { e.preventDefault(); if (!e.repeat) showTabScoreboard(true); return; }
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+    if (chatOpen) return;
+    if ((e.key === 'y' || e.key === 'Y' || e.key === 'u' || e.key === 'U') && !e.ctrlKey && !e.metaKey && !e.altKey && !e.repeat) {
+      if (openChat(e.key === 'u' || e.key === 'U')) { e.preventDefault(); return; }
+    }
     if (e.key === 'Escape') { e.preventDefault(); togglePauseModal(); return; }
     if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) { if (!e.repeat && !isPaused) requestReload(); return; }
     setKey(e.key, true);
@@ -4062,6 +4349,63 @@ function chooseOfflineMap(mapId) {
     setKey(e.key, false);
   });
   window.addEventListener('blur', () => { resetInput(); showTabScoreboard(false); });
+
+  // ---------------------------------------------------------------- in-game text chat (Y = everyone, U = team)
+
+  function openChat(teamOnly) {
+    if (mode !== 'online' || screenName !== 'game' || isPaused) return false;
+    const box = $('chat-box'), inp = $('chat-input');
+    if (!box || !inp) return false;
+    if (teamOnly && onlineDraft && onlineDraft.mode === 'freeforall') { addFeed('Chế độ Tử chiến không có chat đội.', 'warn'); return false; }
+    chatOpen = true; chatTeamMode = !!teamOnly;
+    resetInput();
+    const tag = $('chat-tag');
+    tag.textContent = teamOnly ? 'ĐỘI' : 'TẤT CẢ';
+    box.classList.toggle('team', !!teamOnly);
+    box.hidden = false; inp.value = '';
+    $('chat-log').classList.add('open');
+    setTimeout(() => inp.focus(), 0);   // focus after the opening key press has finished, so "y"/"u" isn't typed
+    return true;
+  }
+
+  function closeChat(send) {
+    if (!chatOpen) return;
+    const inp = $('chat-input');
+    const text = inp.value.trim();
+    chatOpen = false;
+    $('chat-box').hidden = true;
+    $('chat-log').classList.remove('open');
+    inp.blur(); inp.value = '';
+    if (send && text) sendMessage('CChat', { cchText: text.slice(0, 120), cchTeam: chatTeamMode });
+    resetInput();
+    try { canvas.focus({ preventScroll: true }); } catch (_) {}
+  }
+
+  function addChatLine(sender, text, teamOnly) {
+    const log = $('chat-log'); if (!log) return;
+    const row = document.createElement('div');
+    row.className = 'chat-line' + (teamOnly ? ' team' : '');
+    const tag = document.createElement('b'); tag.className = 'chat-line-tag'; tag.textContent = teamOnly ? '[ĐỘI]' : '[TẤT CẢ]';
+    const who = document.createElement('b'); who.className = 'chat-line-name' + (sender === username ? ' me' : ''); who.textContent = sender + ':';
+    const msg = document.createElement('span'); msg.className = 'chat-line-text'; msg.textContent = text;
+    row.append(tag, who, msg);
+    log.append(row);
+    while (log.children.length > CHAT_MAX_LINES) log.firstChild.remove();
+    setTimeout(() => row.classList.add('faded'), CHAT_FADE_MS);
+    setTimeout(() => row.remove(), CHAT_FADE_MS + 1500);
+  }
+
+  (function initChat() {
+    const inp = $('chat-input'), form = $('chat-box');
+    if (!inp || !form) return;
+    inp.addEventListener('keydown', e => {
+      e.stopPropagation();   // typing must never move / fire the tank
+      if (e.key === 'Enter') { e.preventDefault(); closeChat(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeChat(false); }
+    });
+    inp.addEventListener('keyup', e => e.stopPropagation());
+    form.addEventListener('submit', e => { e.preventDefault(); closeChat(true); });
+  })();
 
   function pointerToWorld(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
@@ -4390,7 +4734,7 @@ function chooseOfflineMap(mapId) {
   $('lobby-back').addEventListener('click', () => { if (activeRoom) sendMessage('CLeaveRoom'); else { closeSocket(); showScreen('home'); } });
   $('copy-room-code').addEventListener('click', async () => {
     const code = $('room-code').textContent;
-    try { await navigator.clipboard.writeText(code); $('copy-room-code').textContent = '✓'; setTimeout(() => $('copy-room-code').textContent = '⧉', 900); }
+    try { await navigator.clipboard.writeText(code); const b = $('copy-room-code'); b.textContent = '✓ ĐÃ SAO CHÉP'; b.classList.add('copied'); setTimeout(() => { b.textContent = 'SAO CHÉP MÃ'; b.classList.remove('copied'); }, 1200); }
     catch (_) { $('join-id').value = code; }
   });
   $('overlay-action').addEventListener('click', () => { const action = roundOverlayAction; hideOverlay(); if (action) action(); });
@@ -4445,7 +4789,7 @@ function chooseOfflineMap(mapId) {
   // Production bundles the site and socket behind one HTTPS origin. This
   // avoids a mixed-content error and makes the public game URL shareable.
   // Local development still connects directly to the Haskell server.
-  const defaultWsUrl = isLocalHost && staticDevPorts.has(window.location.port)
+  const defaultWsUrl = isLocalHost && window.location.port !== '8081'   // any local static server (5500, 3000, 8080...) -> game server on 8081
     ? `${pageProtocol}//${pageHost}:8081`
     : `${pageProtocol}//${window.location.host}/ws`;
   const savedServer = localStorage.getItem('tankwar-server');

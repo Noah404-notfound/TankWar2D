@@ -287,6 +287,9 @@ data Maze = Maze
     -- ^ Điểm spawn cho xe tăng
   , mazeBoxSpawnPts :: ![Vec2]
     -- ^ Vị trí có thể spawn hộp bí ẩn
+  , mazeBaseSpawns :: ![Vec2]
+    -- ^ Tối đa 4 điểm gốc ở các góc bản đồ (spawn_centres của layout + góc dự phòng),
+    -- dùng làm căn cứ đội giống chế độ offline
   } deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
 --------------------------------------------------------------------------------

@@ -68,6 +68,26 @@ data ClientMessage
     -- ^ Yêu cầu bảng xếp hạng
 
   | CPing
+
+  | CChat
+      { cchText :: !Text
+      , cchTeam :: !Bool
+      }
+    -- ^ Chat trong trận: cchTeam = True chỉ gửi cho đồng đội (phím U), False gửi cho cả phòng (phím Y)
+
+  | CStartMatchmaking
+      { csmMode     :: !Text
+      , csmTeamSize :: !Int
+      , csmHull     :: !Text
+      , csmGun      :: !Text
+      }
+    -- ^ Vào hàng chờ ghép trận ngẫu nhiên ("deathmatch" | "team" | "zone")
+
+  | CCancelMatchmaking
+    -- ^ Rời hàng chờ ghép trận
+
+  | CRequestHistory
+    -- ^ Xin lịch sử đấu của chính mình
     -- ^ Heartbeat
   deriving (Show, Eq, Generic, ToJSON, FromJSON)
 
@@ -126,10 +146,13 @@ data ServerMessage
   | SMatchOver !Text ![(Text, Int)]
     -- ^ (Người thắng chung cuộc, bảng điểm cuối cùng)
 
+  | SChat !Text !Text !Bool
+    -- ^ (Người gửi, nội dung, có phải chat đội không)
+
   | SKillEvent !Text !Text
     -- ^ (Người giết, Người bị giết) — để hiển thị kill feed
 
-  | SMysteryBoxPickup !Text !BulletType
+  | SMysteryBoxPickup !Text !Text
     -- ^ (Người nhặt, Loại đạn nhận được)
 
   | SLeaderboard ![(Text, Int, Int)]
@@ -139,5 +162,14 @@ data ServerMessage
     -- ^ Lỗi chung
 
   | SPong
+
+  | SMatchFound !Value
+    -- ^ Đã ghép đủ người: {opponent, map, mode, players}
+
+  | SMatchmakingStatus !Value
+    -- ^ Tiến độ hàng chờ: {status, queueCount, needed}
+
+  | SMatchHistory ![MatchRecord]
+    -- ^ Lịch sử các trận gần nhất của người chơi
     -- ^ Heartbeat response
   deriving (Show, Eq, Generic, ToJSON, FromJSON)

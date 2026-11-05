@@ -17,7 +17,8 @@ import Data.Time.Clock          (getCurrentTime)
 import Data.Time.Format         (formatTime, defaultTimeLocale)
 import System.Random            (randomRIO)
 import GHC.Clock                (getMonotonicTime)
-import Data.List                (find)
+import Data.List                (find, minimumBy)
+import Data.Ord                 (comparing)
 import Data.Maybe               (mapMaybe, isJust, fromMaybe)
 
 import Common.Types
@@ -31,7 +32,8 @@ import Server.Database.MatchRepo  (saveMatchResult)
 import Server.Persistence         (MatchStore, appendMatchRecord)
 import Common.GameRules           ( grantWeapon, retainActiveEntities, tickTankTimers, applyKill
                                       , respawnTank, resetTankForRound, teamBase, teamSpawnPositions
-                                      , updateZone, rankingWinner, teamWinnerName, matchWinnerByWins, bumpWin )
+                                      , teamBaseAt, teamSpawnPositionsAt, cornerSpawns
+                                      , updateZone, moveZone, rankingWinner, teamWinnerName, matchWinnerByWins, bumpWin )
 
 --------------------------------------------------------------------------------
 -- Khởi chạy Game Loop cho một phòng
@@ -56,11 +58,16 @@ gameLoopForever ss db store roomId lastT acc = do
   case maybeRoom of
     Nothing -> return ()  -- Phòng đã bị xoá
     Just room
-      -- Chỉ còn <= 1 người: không thể tiếp tục trận, đưa phòng về Lobby.
-      | length (rsPlayerIds room) < 2
+      -- Mọi đối thủ đã thoát phòng: người chơi / đội còn lại thắng ngay (màn hình Victory).
+      | not (isLobbyOrOver (rsPhase room))
+      , Just w <- abandonedWinner room -> do
+          putStrLn $ "[GameLoop] Phòng " ++ show roomId ++ " chỉ còn một bên, " ++ show w ++ " thắng"
+          finishMatch ss db store roomId w
+      -- Không còn người thật nào: dừng trận, đưa phòng về Lobby.
+      | null (rsPlayerIds room)
       , not (isLobbyOrOver (rsPhase room)) -> do
           atomically $ modifyRoom ss roomId $ \r -> r { rsPhase = LobbyPhase }
-          putStrLn $ "[GameLoop] Phòng " ++ show roomId ++ " không đủ người, dừng trận"
+          putStrLn $ "[GameLoop] Phòng " ++ show roomId ++ " không còn người, dừng trận"
       | otherwise ->
           case rsPhase room of
             MatchOverPhase _ -> return ()  -- Trận kết thúc, dừng loop
@@ -72,13 +79,68 @@ gameLoopForever ss db store roomId lastT acc = do
                   ticks   = floor (total / stepSec) :: Int
                   rest    = total - fromIntegral ticks * stepSec
               replicateM_ ticks (tickRoom ss db store roomId)
-              when (ticks > 0) $ broadcastSnapshot ss roomId
+              when (ticks > 0) $ do
+                stillPlaying <- atomically $
+                  fmap (maybe False (not . isLobbyOrOver . rsPhase)) (getRoom ss roomId)
+                when stillPlaying $ broadcastSnapshot ss roomId
               threadDelay 2000
               gameLoopForever ss db store roomId now rest
   where
     isLobbyOrOver LobbyPhase = True
     isLobbyOrOver (MatchOverPhase _) = True
     isLobbyOrOver _ = False
+
+-- | Có người đã thoát (bot thay thế) và một bên không còn người thật nào?
+-- Trả về tên một người chơi thật của bên còn lại.
+abandonedWinner :: RoomState -> Maybe Text
+abandonedWinner room
+  | null humans || null (rsBotIds room) = Nothing
+  | rsGameMode room == "deathmatch" = case humans of
+      [h] -> Just h
+      _   -> Nothing
+  | null humans0 = case humans1 of { (h:_) -> Just h; [] -> Nothing }
+  | null humans1 = case humans0 of { (h:_) -> Just h; [] -> Nothing }
+  | otherwise = Nothing
+  where
+    humans  = rsPlayerIds room
+    teamOf p = fmap tankTeam (Map.lookup p (rsTanks room))
+    humans0 = [ p | p <- humans, teamOf p == Just 0 ]
+    humans1 = [ p | p <- humans, teamOf p == Just 1 ]
+
+-- | Bot đơn giản thay người chơi đã thoát: áp sát / lùi ra khỏi đối thủ gần nhất,
+-- ngắm theo đối thủ và bắn khi trong tầm.
+botInput :: Float -> Map Text Tank -> Tank -> PlayerInput
+botInput clock tanks me =
+  case enemies of
+    [] -> emptyInput
+    _  ->
+      let target = minimumBy (comparing (vec2Dist (tankPos me) . tankPos)) enemies
+          Vec2 mx my = tankPos me
+          Vec2 tx ty = tankPos target
+          dx = tx - mx
+          dy = ty - my
+          dist = sqrt (dx * dx + dy * dy)
+          wobble = 0.1 * sin (clock * 1.7 + fromIntegral (length (show (tankId me))))
+          angle = atan2 dy dx + wobble
+          sgn :: Float
+          sgn | dist > 380 = 1
+              | dist < 160 = -1
+              | otherwise  = 0
+          strafe = (floor (clock / 1.3) :: Int) `mod` 2 == 0
+      in PlayerInput
+           { piMoveRight = sgn * dx > 40
+           , piMoveLeft  = sgn * dx < -40
+           , piMoveDown  = sgn * dy > 40 || (sgn == 0 && not strafe)
+           , piMoveUp    = sgn * dy < -40 || (sgn == 0 && strafe)
+           , piMouseAngle = angle
+           , piFire      = dist < 800
+           , piReload    = False
+           }
+  where
+    enemies = [ o | o <- Map.elems tanks
+                  , tankId o /= tankId me
+                  , tankAlive o
+                  , tankTeam me < 0 || tankTeam o /= tankTeam me ]
 
 --------------------------------------------------------------------------------
 -- Một Tick (≈ 16.67ms)
@@ -114,10 +176,13 @@ tickRoom ss db store roomId = do
 
       -- 2) IN GAME: Vòng lặp chính
       InGamePhase -> do
-        tickInGame ss db store roomId room
+        tickInGame ss db store roomId room True
 
       -- 3) ROUND END: Chờ trước khi bắt đầu round mới
       RoundEndPhase t winner -> do
+        -- Giai đoạn kết thúc ván: thế giới vẫn chạy (xe di chuyển, đạn bay) nhưng
+        -- không ai bị trúng đạn / nhặt hộp, giống chế độ offline.
+        tickInGame ss db store roomId room False
         let t' = t - dt
         if t' <= 0
           then advanceAfterRound ss db store roomId
@@ -135,19 +200,25 @@ tickRoom ss db store roomId = do
 --   * "deathmatch": hồi sinh sau 5 giây, trận kéo dài 'deathmatchSeconds', thắng theo điểm.
 --   * "team": không hồi sinh trong round, round kết thúc khi một đội bị loại hoặc hết giờ.
 --   * "zone": hồi sinh sau 5 giây, đội chiếm đủ vùng giữa bản đồ thì thắng.
-tickInGame :: ServerState -> MongoPool -> MatchStore -> Text -> RoomState -> IO ()
-tickInGame ss db store roomId room = do
+tickInGame :: ServerState -> MongoPool -> MatchStore -> Text -> RoomState -> Bool -> IO ()
+tickInGame ss db store roomId room live = do
   let mode        = rsGameMode room
       teamMode    = mode /= "deathmatch"
       tanks       = rsTanks room
       bullets     = rsBullets room
       maze        = rsMaze room
-      inputs      = rsInputs room
-      clock'      = rsMatchClock room + dt
+      botInputs   = Map.fromList
+                      [ (bid, botInput clock' tanks bt)
+                      | bid <- rsBotIds room
+                      , Just bt <- [Map.lookup bid tanks]
+                      , tankAlive bt ]
+      inputs      = Map.union (rsInputs room) botInputs
+      clock'      = if live then rsMatchClock room + dt else rsMatchClock room
       respawnSecs = if mode == "team" then 0 else respawnSeconds
 
   -- Bước 1: bộ đếm xe (điểm sống sót, bất tử, chờ hồi sinh) và vũ khí
-  let tanks1 = Map.mapWithKey (\pid t -> updateWeaponCooldown dt pid (tickTankTimers dt t)) tanks
+  let powerOf pid = Map.findWithDefault 0 pid (rsPower room)
+      tanks1 = Map.mapWithKey (\pid t -> updateWeaponCooldown (if powerOf pid > 0 then dt / 0.52 else dt) pid (tickTankTimers dt t)) tanks
 
   -- Bước 2: Xử lý bắn (spawn đạn mới)
   (tanks2, newBullets) <- processFireInputs inputs tanks1 maze
@@ -155,7 +226,7 @@ tickInGame ss db store roomId room = do
   -- Bước 3: Di chuyển xe tăng + va chạm tường
   let tanks3 = Map.mapWithKey (\pid t ->
         case Map.lookup pid inputs of
-          Just inp -> moveTank dt inp maze t
+          Just inp -> moveTank (if powerOf pid > 0 then dt * 1.55 else dt) inp maze t
           Nothing  -> t
         ) tanks2
 
@@ -163,11 +234,14 @@ tickInGame ss db store roomId room = do
   let bullets2 = filter bulletAlive (map (moveBullet dt maze) (bullets ++ newBullets))
 
   -- Bước 5: Va chạm đạn - xe tăng (điểm, chuỗi hạ, hồi sinh, không bắn nhầm đồng đội)
-  (tanks4, bullets3, killEvents) <- processBulletTankCollisions teamMode respawnSecs tanks3 bullets2
+  (tanks4, bullets3, killEvents) <-
+    if live then processBulletTankCollisions teamMode respawnSecs tanks3 bullets2
+            else return (tanks3, bullets2, [])
 
   -- Bước 6: Va chạm đạn - Mystery Box
   (boxes1, bullets4, boxEvents) <-
-    processBulletBoxCollisions (rsMysteryBoxes room) bullets3 tanks4
+    if live then processBulletBoxCollisions (rsMysteryBoxes room) bullets3 tanks4
+            else return (rsMysteryBoxes room, bullets3, [])
 
   -- Bước 7: Cập nhật Mystery Box timer & spawn
   (boxes2, boxTimer') <- updateMysteryBoxTimer dt (rsBoxTimer room) boxes1 maze
@@ -175,39 +249,42 @@ tickInGame ss db store roomId room = do
   -- Bước 8: Ghi nhận kill events vào DB & broadcast
   forM_ killEvents $ \(killer, victim) -> do
     broadcastToRoom ss roomId (SKillEvent killer victim)
-    addKill db killer
-    addDeath db victim
+    -- Ghi DB ở luồng riêng: nếu MongoDB chậm/timeout thì game loop không bị đứng.
+    void $ forkIO $ do
+      _ <- addKill db killer
+      _ <- addDeath db victim
+      return ()
 
   -- Bước 9: Ghi nhận box pickup events và trao vũ khí cho người nhặt
-  forM_ boxEvents $ \(picker, btype) ->
+  forM_ boxEvents $ \(picker, btype) -> do
+    putStrLn $ "[Box] " ++ show picker ++ " chạm hộp -> " ++ show btype
     broadcastToRoom ss roomId (SMysteryBoxPickup picker btype)
-  let tanks4g = foldl (\m (picker, btype) ->
-                  Map.adjust (\t -> t { tankWeapon = grantWeapon btype (tankWeapon t) }) picker m)
-                tanks4 boxEvents
+  let (tanks4g, power1) = applyBoxRewards respawnSecs boxEvents tanks4 (rsPower room)
 
   -- Bước 10: Hồi sinh (Tử chiến, Cấm Địa) và cập nhật vùng chiếm
-  tanks5 <- respawnTanks mode maze tanks4g
+  tanks5 <- respawnTanks mode maze (rsAnchorIdx room) tanks4g
   let finalTanks = Map.elems tanks5
       (zone', zoneWinner) = case (mode, rsZone room) of
-        ("zone", Just z) -> let (z2, w) = updateZone dt z finalTanks in (Just z2, w)
+        ("zone", Just z) -> let (z2, w) = updateZone dt (moveZone maze dt z) finalTanks in (Just z2, w)
         _                -> (rsZone room, Nothing)
 
   -- retainActiveEntities: tick tính từ snapshot cũ, nếu người chơi vừa rời phòng
   -- thì không được "hồi sinh" xe tăng/đạn của họ khi ghi lại state.
   atomically $ modifyRoom ss roomId $ \r ->
-    let (tanksKept, bulletsKept) = retainActiveEntities (rsPlayerIds r) tanks5 bullets4
+    let (tanksKept, bulletsKept) = retainActiveEntities (rsPlayerIds r ++ rsBotIds r) tanks5 bullets4
     in r
     { rsTanks        = tanksKept
     , rsBullets      = bulletsKept
     , rsLasers       = []
     , rsMysteryBoxes = boxes2
     , rsBoxTimer     = boxTimer'
+    , rsPower        = Map.filter (> 0) (Map.mapWithKey (\pid v -> if maybe False tankAlive (Map.lookup pid tanks5) then v - dt else 0) power1)
     , rsMatchClock   = clock'
     , rsZone         = zone'
     }
 
-  -- Bước 11: Điều kiện kết thúc theo chế độ
-  case mode of
+  -- Bước 11: Điều kiện kết thúc theo chế độ (chỉ khi trận còn đang tính)
+  when live $ case mode of
     "deathmatch" ->
       when (clock' >= deathmatchSeconds) $
         finishMatch ss db store roomId (rankingWinner finalTanks)
@@ -262,26 +339,26 @@ finishMatch ss db store roomId winner = do
       [ (tankId t, tankPoints t) | t <- Map.elems (rsTanks r) ] r
 
 -- | Hồi sinh các xe đã hết thời gian chờ (không áp dụng cho Đấu đội).
-respawnTanks :: Text -> Maze -> Map Text Tank -> IO (Map Text Tank)
-respawnTanks mode maze tanks
+respawnTanks :: Text -> Maze -> Int -> Map Text Tank -> IO (Map Text Tank)
+respawnTanks mode maze anchorIdx tanks
   | mode == "team" = return tanks
   | otherwise = foldM step tanks (Map.keys tanks)
   where
     step acc pid = case Map.lookup pid acc of
       Just t | not (tankAlive t) && tankRespawnTimer t <= 0 -> do
-        pos <- pickRespawnPos mode maze acc t
+        pos <- pickRespawnPos mode maze anchorIdx acc t
         return (Map.insert pid (respawnTank pos t) acc)
       _ -> return acc
 
 -- | Chọn điểm hồi sinh: Cấm Địa về căn cứ của đội; Tử chiến chọn ngẫu nhiên
 -- điểm không có xe địch ở gần (nếu không có thì chọn bất kỳ).
-pickRespawnPos :: Text -> Maze -> Map Text Tank -> Tank -> IO Vec2
-pickRespawnPos mode maze tanks t = do
-  let spawns = mazeSpawnPts maze
+pickRespawnPos :: Text -> Maze -> Int -> Map Text Tank -> Tank -> IO Vec2
+pickRespawnPos mode maze anchorIdx tanks t = do
+  let spawns = cornerSpawns maze
       farFrom p o = tankId o == tankId t || not (tankAlive o)
                     || vec2Dist p (tankPos o) > tankHitRadius * 5
       preferred
-        | mode == "zone" = teamBase maze (tankTeam t)
+        | mode == "zone" = teamBaseAt maze anchorIdx (tankTeam t)
         | otherwise = [ p | p <- spawns, all (farFrom p) (Map.elems tanks) ]
       pool = if null preferred then spawns else preferred
   if null pool
@@ -471,9 +548,9 @@ spawnBullets tank btype = do
           dir3 = vec2Rotate shotgunSpreadAngle dir
           sp1  = vec2Add pos (vec2Scale spawnOffset dir1)
           sp3  = vec2Add pos (vec2Scale spawnOffset dir3)
-      return [ mkBullet sp1 dir1 1036 NormalBullet (tankId tank)
-             , mkBullet spawnPos dir2 1112 NormalBullet (tankId tank)
-             , mkBullet sp3 dir3 1036 NormalBullet (tankId tank)
+      return [ mkBullet sp1 dir1 1036 ShotgunBullet (tankId tank)
+             , mkBullet spawnPos dir2 1112 ShotgunBullet (tankId tank)
+             , mkBullet sp3 dir3 1036 ShotgunBullet (tankId tank)
              ]
 
     LaserBullet ->
@@ -485,7 +562,7 @@ spawnBullets tank btype = do
       return [mkBullet spawnPos dir wallPiercingSpeed WallPiercingBullet (tankId tank)]
 
     GatlingBullet ->
-      return [mkBullet spawnPos dir 1250 NormalBullet (tankId tank)]
+      return [mkBullet spawnPos dir 1250 GatlingBullet (tankId tank)]
 
 mkBullet :: Vec2 -> Vec2 -> Float -> BulletType -> Text -> Bullet
 mkBullet pos dir speed btype ownerId = Bullet
@@ -584,41 +661,56 @@ processBulletTankCollisions teamMode respawnSecs tanks bullets = do
 -- Va chạm Đạn - Mystery Box
 --------------------------------------------------------------------------------
 
+-- | Xe tăng chỉ cần chạy qua hộp là nhặt được (đạn bay qua không phá hộp nữa).
+-- Giữ tên cũ để không đổi chỗ gọi; danh sách đạn được trả về nguyên vẹn.
 processBulletBoxCollisions :: [MysteryBox] -> [Bullet] -> Map Text Tank
-                          -> IO ([MysteryBox], [Bullet], [(Text, BulletType)])
+                          -> IO ([MysteryBox], [Bullet], [(Text, Text)])
 processBulletBoxCollisions boxes bullets tanks = do
-  let (boxes', bullets', events) = foldl checkBulletBox (boxes, [], []) bullets
-  return (boxes', bullets', events)
+  (keptRev, evtsRev) <- foldM step ([], []) boxes
+  return (reverse keptRev, bullets, reverse evtsRev)
   where
-    checkBulletBox (bxs, buls, evts) bul =
-      case findHitBox bul bxs of
-        Nothing -> (bxs, bul : buls, evts)
-        Just idx -> do
-          let -- Xoá box bị phá
-              bxs' = removeAt idx bxs
-              -- Chọn loại đạn ngẫu nhiên cho người bắn
-              -- (Trong phiên bản đồng bộ, dùng deterministic random)
-              btype = randomBulletType (floor $ vx (bulPos bul))
-              evts' = evts ++ [(bulOwnerId bul, btype)]
-          -- Lưu ý: Không thể dùng IO ở đây vì fold thuần
-          -- Thay vào đó dùng pseudo-random từ vị trí đạn
-          (bxs', buls, evts')
+    aliveTanks = [ t | t <- Map.elems tanks, tankAlive t ]
+    pickerOf box = find (\t -> vec2Dist (tankPos t) (mbPos box) < (tankHitRadius + boxRadius)) aliveTanks
+    baseRewards = ["ShotgunBullet", "LaserBullet", "WallPiercingBullet", "GatlingBullet", "shield", "power", "bomb"] :: [Text]
+    rewardsFor t =
+      let deadAlly = tankTeam t >= 0 && any (\o -> not (tankAlive o) && tankTeam o == tankTeam t && tankId o /= tankId t) (Map.elems tanks)
+      in baseRewards ++ (if deadAlly then ["revive", "revive"] else [])
+    step (kept, evts) box
+      | not (mbActive box) = return (box : kept, evts)
+      | otherwise = case pickerOf box of
+          Nothing -> return (box : kept, evts)
+          Just t -> do
+            let rewards = rewardsFor t
+            i <- randomRIO (0, length rewards - 1)
+            return (kept, (tankId t, rewards !! i) : evts)
 
-    findHitBox bul bxs =
-      let hits = [ i | (i, box) <- zip [0..] bxs
-                     , mbActive box
-                     , vec2Dist (bulPos bul) (mbPos box) < (bulletRadius + boxRadius)
-                 ]
-      in case hits of
-        (i:_) -> Just i
-        []    -> Nothing
-
-    removeAt idx xs = take idx xs ++ drop (idx + 1) xs
-
-    -- Pseudo-random dựa trên hash vị trí (deterministic cho replay)
-    randomBulletType seed =
-      let btypes = [ShotgunBullet, LaserBullet, WallPiercingBullet, GatlingBullet]
-      in btypes !! (abs seed `mod` length btypes)
+-- | Áp dụng phần thưởng hộp: vũ khí 15s, khiên 5s, tăng tốc 3s, bom (nổ chết người nhặt),
+-- hồi sinh đồng đội (chỉ khi có đồng đội đã bị hạ). Giống chế độ offline.
+applyBoxRewards :: Float -> [(Text, Text)] -> Map Text Tank -> Map Text Float
+                -> (Map Text Tank, Map Text Float)
+applyBoxRewards respawnSecs events tanks0 power0 = foldl step (tanks0, power0) events
+  where
+    step (tks, pw) (picker, reward)
+      | reward == "shield" =
+          (Map.adjust (\t -> t { tankInvulnerabilityLeft = max 5 (tankInvulnerabilityLeft t) }) picker tks, pw)
+      | reward == "power" = (tks, Map.insert picker 3 pw)
+      | reward == "bomb" =
+          (Map.adjust (\t -> snd (applyKill respawnSecs t t)) picker tks, Map.delete picker pw)
+      | reward == "revive" = (reviveAlly picker tks, pw)
+      | otherwise =
+          (Map.adjust (\t -> t { tankWeapon = grantWeapon (weaponOf reward) (tankWeapon t) }) picker tks, pw)
+    weaponOf r
+      | r == "ShotgunBullet" = ShotgunBullet
+      | r == "LaserBullet" = LaserBullet
+      | r == "WallPiercingBullet" = WallPiercingBullet
+      | r == "GatlingBullet" = GatlingBullet
+      | otherwise = NormalBullet
+    reviveAlly picker tks = case Map.lookup picker tks of
+      Nothing -> tks
+      Just p ->
+        case [ o | o <- Map.elems tks, not (tankAlive o), tankTeam o == tankTeam p, tankTeam p >= 0, tankId o /= picker ] of
+          (ally:_) -> Map.insert (tankId ally) (respawnTank (tankPos p) ally) tks
+          []       -> tks
 
 --------------------------------------------------------------------------------
 -- Mystery Box Timer & Spawn
@@ -658,10 +750,13 @@ startNewRound ss roomId = do
     Just room -> do
       -- Giữ nguyên map đã được chọn cho toàn bộ trận đấu.
       newMaze <- generateTrainingMaze (rsMapId room)
-      let pids    = rsPlayerIds room
+      -- Giữ nguyên căn cứ đã bốc ngẫu nhiên lúc bắt đầu trận (giống chế độ đấu bot):
+      -- hai đội luôn ở hai góc đối diện chéo trong mọi round của trận.
+      let anchorIdx = rsAnchorIdx room
+      let pids    = rsPlayerIds room ++ rsBotIds room
           teamed  = rsGameMode room /= "deathmatch"
           teamOf  = Map.map tankTeam (rsTanks room)
-          basePos = teamSpawnPositions newMaze teamOf pids
+          basePos = teamSpawnPositionsAt newMaze anchorIdx teamOf pids
       -- Xáo trộn điểm spawn ngẫu nhiên trên toàn bản đồ (Tử chiến)
       shuffledSpawns <- shuffleList (mazeSpawnPts newMaze)
       let posFor :: Int -> Text -> Vec2
@@ -683,13 +778,13 @@ startNewRound ss roomId = do
         , rsBullets      = []
         , rsLasers       = []
         , rsMysteryBoxes = []
-        , rsPhase        = CountdownPhase countdownDuration
+        , rsPhase        = InGamePhase
         , rsRoundNumber  = rsRoundNumber r + 1
         , rsBoxTimer     = boxDelay
         , rsMatchClock   = 0
+        , rsAnchorIdx    = anchorIdx
         }
 
-      broadcastToRoom ss roomId (SCountdown countdownDuration)
       putStrLn $ "[Game] Round mới phòng " ++ show roomId ++ " trên map " ++ show (rsMapId room)
 
 --------------------------------------------------------------------------------
@@ -736,11 +831,15 @@ handleMatchOver ss db store roomId winner scores room = do
   putStrLn $ "[Game] Trận đấu kết thúc phòng " ++ show roomId
           ++ " - Người thắng: " ++ show winner
 
-  -- Sau 5 giây, chuyển phòng về Lobby
-  void $ forkIO $ do
-    threadDelay 5000000  -- 5 giây
-    atomically $ modifyRoom ss roomId $ \r -> r
-      { rsPhase = LobbyPhase }
+  -- Đưa phòng về Lobby ngay (người thoát giữa trận bị bỏ khỏi phòng), để màn hình
+  -- kết quả có nút "Trở lại phòng đấu" và chủ phòng mở ván mới với cùng những người chơi.
+  atomically $ modifyRoom ss roomId $ \r -> r
+    { rsPhase      = LobbyPhase
+    , rsDraftStage = "lobby"
+    , rsBotIds     = []
+    , rsTanks      = Map.filterWithKey (\k _ -> k `elem` rsPlayerIds r) (rsTanks r)
+    , rsTeams      = Map.filterWithKey (\k _ -> k `elem` rsPlayerIds r) (rsTeams r)
+    }
 
 --------------------------------------------------------------------------------
 -- Broadcast World Snapshot

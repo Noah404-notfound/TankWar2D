@@ -35,7 +35,7 @@ import Common.Types
 import Common.Config
 import Common.Protocol
 import Server.State
-import Common.GameRules       (assignTeams, teamSpawnPositions, initialZone, resetTankForRound)
+import Common.GameRules       (assignTeams, teamSpawnPositions, teamSpawnPositionsAt, cornerSpawns, initialZone, resetTankForRound)
 
 --------------------------------------------------------------------------------
 -- Tạo phòng mới
@@ -94,6 +94,9 @@ handleCreateRoom ss username roomName maxP password requestedMode = do
             , rsMatchClock   = 0
             , rsTeamWins     = [0, 0]
             , rsZone         = Nothing
+            , rsBotIds       = []
+            , rsPower        = Map.empty
+            , rsAnchorIdx    = 0
             }
 
       atomically $ do
@@ -184,13 +187,29 @@ handleLeaveRoom ss username = do
     Nothing  -> sendToClient ss username (SRoomError "Bạn không ở trong phòng nào!")
     Just rid -> do
       atomically $ do
-        modifyRoom ss rid $ \r -> r
-          { rsPlayerIds = filter (/= username) (rsPlayerIds r)
-          , rsTanks     = Map.delete username (rsTanks r)
-          , rsInputs    = Map.delete username (rsInputs r)
-          , rsTeams     = Map.delete username (rsTeams r)
-          , rsVotes     = Map.delete username (rsVotes r)
-          }
+        modifyRoom ss rid $ \r ->
+          let inMatch = case rsPhase r of
+                CountdownPhase _  -> True
+                InGamePhase       -> True
+                RoundEndPhase _ _ -> True
+                _                 -> False
+              hasTank = Map.member username (rsTanks r)
+              toBot   = inMatch && hasTank
+          in if toBot
+               -- Thoát giữa trận: giữ nguyên xe + đội, giao cho bot điều khiển.
+               then r
+                 { rsPlayerIds = filter (/= username) (rsPlayerIds r)
+                 , rsInputs    = Map.delete username (rsInputs r)
+                 , rsVotes     = Map.delete username (rsVotes r)
+                 , rsBotIds    = username : filter (/= username) (rsBotIds r)
+                 }
+               else r
+                 { rsPlayerIds = filter (/= username) (rsPlayerIds r)
+                 , rsTanks     = Map.delete username (rsTanks r)
+                 , rsInputs    = Map.delete username (rsInputs r)
+                 , rsTeams     = Map.delete username (rsTeams r)
+                 , rsVotes     = Map.delete username (rsVotes r)
+                 }
         clearClientRoom ss username
 
       -- Kiểm tra phòng trống -> xoá phòng
@@ -254,8 +273,11 @@ handleChooseTeam ss username team = withLobbyRoom ss username $ \rid room ->
             broadcastDraft ss rid
 
 handleMapVote :: ServerState -> Text -> Text -> IO ()
-handleMapVote ss username mapId = withLobbyRoom ss username $ \rid room ->
-  if mapId `notElem` ["forest", "ruins", "depot", "random"]
+handleMapVote ss username requestedMap = withLobbyRoom ss username $ \rid room ->
+  let zoneRoom = rsGameMode room == "zone"
+      -- Cấm Địa chỉ có đúng một bản đồ: mọi phiếu được ghi nhận là "camdia".
+      mapId    = if zoneRoom then "camdia" else requestedMap
+  in if not zoneRoom && mapId `notElem` ["forest", "ruins", "depot", "random"]
     then sendToClient ss username (SRoomError "Bản đồ không hợp lệ.")
     else do
       atomically $ modifyRoom ss rid $ \r -> r
@@ -296,11 +318,18 @@ broadcastDraft ss rid = do
     Nothing -> return ()
     Just room -> broadcastToRoom ss rid (SRoomDraft $ roomDraftValue room)
 
+-- | Cấm Địa chỉ có một bản đồ nên mọi người chơi luôn được tính là đã chọn "camdia"
+-- (không phụ thuộc việc từng client có kịp gửi phiếu hay không).
+effectiveVotes :: RoomState -> Map Text Text
+effectiveVotes room
+  | rsGameMode room == "zone" = Map.fromList [ (p, "camdia") | p <- rsPlayerIds room ]
+  | otherwise                 = rsVotes room
+
 roomDraftValue :: RoomState -> Value
 roomDraftValue room = object
   [ "stage" .= rsDraftStage room
   , "mode" .= if rsGameMode room == "deathmatch" then ("freeforall" :: Text) else "teams"
-  , "votes" .= rsVotes room
+  , "votes" .= effectiveVotes room
   , "teams" .= rsTeams room
   , "maxPlayers" .= rsMaxPlayers room
   , "players" .= rsPlayerIds room
@@ -327,6 +356,11 @@ handleStartGame ss username = do
                 (SRoomError $ "Cần ít nhất " <> pack (show minPlayersToStart) <> " người chơi!")
                 >> pure False
           | rsGameMode room /= "deathmatch"
+          , length (rsPlayerIds room) < rsMaxPlayers room ->
+              sendToClient ss username
+                (SRoomError $ "Chế độ này cần đủ " <> pack (show (rsMaxPlayers room)) <> " người chơi mới bắt đầu!")
+                >> pure False
+          | rsGameMode room /= "deathmatch"
           , teamsUnbalanced (rsPlayerIds room) (rsTeams room) ->
               sendToClient ss username (SRoomError "Mỗi đội cần ít nhất 1 người chơi!") >> pure False
           | otherwise -> do
@@ -341,17 +375,21 @@ handleStartGame ss username = do
                 else do
                   voteIdx <- randomRIO (0, length votes - 1)
                   pure (votes !! voteIdx)
-              selectedMap <- if pickedVote == "random"
-                then do
-                  idx <- randomRIO (0, length mapPool - 1)
-                  pure (mapPool !! idx)
-                else pure pickedVote
+              selectedMap <- if rsGameMode room == "zone"
+                then pure "camdia"   -- Cấm Địa luôn dùng bản đồ riêng (giống offline)
+                else if pickedVote == "random"
+                  then do
+                    idx <- randomRIO (0, length mapPool - 1)
+                    pure (mapPool !! idx)
+                  else pure pickedVote
               newMaze <- generateTrainingMaze selectedMap
-              shuffledSpawns <- shuffleList (mazeSpawnPts newMaze)
+              shuffledSpawns <- fmap (\cs -> cs ++ [ p | p <- mazeSpawnPts newMaze, p `notElem` cs ]) (shuffleList (cornerSpawns newMaze))
+              -- Đội 0 bốc ngẫu nhiên 1 trong các góc; đội 1 ở góc đối diện chéo (giữ nguyên cả trận).
+              anchorIdx <- randomRIO (0, max 0 (length (cornerSpawns newMaze) - 1))
               let mode    = rsGameMode room
                   teamed  = mode /= "deathmatch"
                   teamMap = assignTeams pids (rsTeams room)
-                  basePos = teamSpawnPositions newMaze teamMap pids
+                  basePos = teamSpawnPositionsAt newMaze anchorIdx teamMap pids
                   posFor :: Int -> Text -> Vec2
                   posFor idx pid
                     | teamed, Just p <- Map.lookup pid basePos = p
@@ -381,6 +419,9 @@ handleStartGame ss username = do
                 , rsMatchClock = 0
                 , rsTeamWins = [0, 0]
                 , rsZone = if mode == "zone" then Just (initialZone newMaze) else Nothing
+                , rsBotIds = []
+                , rsPower = Map.empty
+                , rsAnchorIdx = anchorIdx
                 }
               broadcastToRoom ss rid (SCountdown countdownDuration)
               broadcastToRoom ss rid (SSelectedMap selectedMap)
@@ -402,8 +443,9 @@ handleSelectMap ss username requestedMap = do
           Just room
             | rsHostPlayer room == username
             , rsPhase room == LobbyPhase -> do
-                let mapId = if requestedMap `elem` ["forest", "ruins", "depot", "random"]
-                              then requestedMap else "forest"
+                let mapId | rsGameMode room == "zone" = "camdia"
+                          | requestedMap `elem` ["forest", "ruins", "depot", "random"] = requestedMap
+                          | otherwise = "forest"
                 modifyRoom ss roomId $ \r -> r
                   { rsVotes = Map.insert username mapId (rsVotes r) }
                 pure (Just (roomId, mapId))
@@ -589,6 +631,9 @@ generateTrainingMaze mapId = do
             ]
           openSpawns = filter (spawnIsClear walls) (explicitSpawns ++ cellCentres)
           spawns = uniqueSpawns openSpawns
+          -- Giống getLocalSpawns của chế độ offline: spawn_centres của layout, rồi 3 góc dự phòng.
+          baseSpawns = take 4 (foldl (\acc p -> if p `elem` acc then acc else acc ++ [p]) []
+                                (explicitSpawns ++ [ Vec2 (w - 288) 288, Vec2 288 (h - 288), Vec2 (w - 288) (h - 288) ]))
       shuffledSpawns <- shuffleList spawns
       return Maze
         { mazeWalls = walls
@@ -596,6 +641,7 @@ generateTrainingMaze mapId = do
         , mazeHeight = h
         , mazeSpawnPts = shuffledSpawns
         , mazeBoxSpawnPts = take 12 shuffledSpawns
+        , mazeBaseSpawns = baseSpawns
         }
   where
     atOrZero i xs = if i < length xs then xs !! i else 0
@@ -728,4 +774,5 @@ generateMaze = do
     , mazeHeight      = h
     , mazeSpawnPts    = randomSpawns
     , mazeBoxSpawnPts = boxSpawns
+    , mazeBaseSpawns  = []
     }

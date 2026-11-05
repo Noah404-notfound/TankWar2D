@@ -192,7 +192,7 @@ testWeaponRules = do
     (wsCooldownState $ wtWeapon $ stepWeapon gatlingBurstDelay (WeaponState GatlingBullet 10 (GatlingBurst 0 gatlingBurstDelay)))
     (Reloading specialBulletCooldown)
 
-  let laserMaze = Maze [Wall (Vec2 10 0) (Vec2 10 20)] 20 20 [] []
+  let laserMaze = Maze [Wall (Vec2 10 0) (Vec2 10 20)] 20 20 [] [] []
       laserSegments = traceLaser laserMaze (Vec2 5 5) (Vec2 1 0)
   assertEq "Laser traces an initial segment and a reflected segment" (length laserSegments) 2
   case laserSegments of

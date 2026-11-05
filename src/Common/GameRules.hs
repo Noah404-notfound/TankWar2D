@@ -12,8 +12,12 @@ module Common.GameRules
   , resetTankForRound
   , teamBase
   , teamSpawnPositions
+  , teamBaseAt
+  , cornerSpawns
+  , teamSpawnPositionsAt
   , assignTeams
   , initialZone
+  , moveZone
   , updateZone
   , rankingWinner
   , teamWinnerName
@@ -219,6 +223,72 @@ teamBase maze team
     anchorB = maximumBy (comparing (vec2Dist anchorA)) spawns
     anchor = if team == 0 then anchorA else anchorB
 
+-- | Căn cứ của một đội, giống chế độ đấu bot: đội 0 neo ở góc thứ idx (bốc ngẫu nhiên),
+-- đội 1 neo ở góc xa nhất (đối diện chéo). Cả đội đứng sát nhau quanh góc đó.
+teamBaseAt :: Maze -> Int -> Int -> [Vec2]
+teamBaseAt maze idx team = clusterSpawns maze anchor 5
+  where
+    corners = cornerSpawns maze
+    anchorA = corners !! (idx `mod` length corners)
+    farthestFirst = head ([ p | p <- corners, p /= anchorA ] ++ [anchorA])
+    anchorB = foldl (\far p -> if vec2Dist p anchorA > vec2Dist far anchorA then p else far)
+                    farthestFirst corners
+    anchor = if team == 0 then anchorA else anchorB
+
+-- | Các điểm gốc ở góc bản đồ: lấy từ layout (giống chế độ offline). Nếu map không có
+-- thì dùng điểm spawn gần mỗi góc nhất.
+cornerSpawns :: Maze -> [Vec2]
+cornerSpawns maze
+  | not (null (mazeBaseSpawns maze)) = mazeBaseSpawns maze
+  | null spawns = [Vec2 100 100]
+  | otherwise = [ minimumBy (comparing (vec2Dist c)) spawns
+                | c <- [ Vec2 0 0, Vec2 (mazeWidth maze) 0, Vec2 0 (mazeHeight maze), Vec2 (mazeWidth maze) (mazeHeight maze) ] ]
+  where spawns = mazeSpawnPts maze
+
+-- | 'count' điểm trống cách nhau 170px quanh điểm neo (điểm neo đứng đầu), bỏ qua điểm
+-- sát tường hoặc ra ngoài biên. Copy của clusterSpawns trong chế độ đấu bot.
+clusterSpawns :: Maze -> Vec2 -> Int -> [Vec2]
+clusterSpawns maze anchor count = take count (valid ++ repeat anchor)
+  where
+    step = 170 :: Float
+    offsets = sortBy (comparing (\(dx, dy) -> sqrt (dx * dx + dy * dy)))
+                [ (fromIntegral ix * step, fromIntegral iy * step) | ix <- [-3 .. 3 :: Int], iy <- [-3 .. 3 :: Int] ]
+    w = mazeWidth maze
+    h = mazeHeight maze
+    valid = [ p | (dx, dy) <- offsets
+                , let p = Vec2 (vx anchor + dx) (vy anchor + dy)
+                , inBounds p, openSpot p ]
+    inBounds (Vec2 x y) = not (x < 120 || y < 120 || x > w - 120 || y > h - 120)
+    inner = drop 4 (mazeWalls maze)
+    -- Mỗi khối tường là 4 đoạn liên tiếp (xem generateTrainingMaze).
+    rects = rectGroups inner
+    rectGroups (e1 : e2 : _ : _ : rest) =
+      (vx (wallStart e1), vy (wallStart e1), vx (wallEnd e1), vy (wallEnd e2)) : rectGroups rest
+    rectGroups _ = []
+    openSpot p@(Vec2 px py) =
+      not (any (\(x1, y1, x2, y2) -> px >= x1 && px <= x2 && py >= y1 && py <= y2) rects)
+      && all (\(Wall a b) -> distToSegment p a b >= 46) inner
+
+-- | Khoảng cách từ một điểm tới một đoạn thẳng.
+distToSegment :: Vec2 -> Vec2 -> Vec2 -> Float
+distToSegment p a b =
+  let dx = vx b - vx a
+      dy = vy b - vy a
+      len2 = dx * dx + dy * dy
+      t = if len2 < 0.0001 then 0
+          else max 0 (min 1 (((vx p - vx a) * dx + (vy p - vy a) * dy) / len2))
+      qx = vx a + t * dx
+      qy = vy a + t * dy
+  in sqrt ((vx p - qx) * (vx p - qx) + (vy p - qy) * (vy p - qy))
+
+teamSpawnPositionsAt :: Maze -> Int -> Map.Map Text Int -> [Text] -> Map.Map Text Vec2
+teamSpawnPositionsAt maze idx teamOf pids = Map.fromList
+  [ (pid, pts !! (i `mod` length pts))
+  | team <- [0, 1]
+  , let pts = teamBaseAt maze idx team
+  , (i, pid) <- zip [0 :: Int ..] [p | p <- pids, Map.lookup p teamOf == Just team]
+  ]
+
 -- | Vị trí xuất hiện đầu round của từng người chơi theo đội.
 teamSpawnPositions :: Maze -> Map.Map Text Int -> [Text] -> Map.Map Text Vec2
 teamSpawnPositions maze teamOf pids = Map.fromList
@@ -248,8 +318,8 @@ assignTeams pids chosen = foldl place fixed unassigned
 initialZone :: Maze -> ZoneState
 initialZone maze = ZoneState
   { zsCx = mazeWidth maze / 2
-  , zsCy = mazeHeight maze / 2
-  , zsRadius = zoneRadius
+  , zsCy = mazeHeight maze / 2 - orbitR
+  , zsRadius = if bigMap maze then 620 else zoneRadius
   , zsOpen = False
   , zsLockLeft = zoneLockSeconds
   , zsElapsed = 0
@@ -260,6 +330,27 @@ initialZone maze = ZoneState
   , zsHold = 0
   , zsHoldTeam = -1
   }
+  where orbitR = if bigMap maze then zoneOrbitRadius else 0
+
+-- | Bản đồ Cấm Địa (5632x5632) có vùng chiếm quay quanh tâm bản đồ như offline.
+bigMap :: Maze -> Bool
+bigMap maze = mazeWidth maze > 5000
+
+zoneOrbitRadius :: Float
+zoneOrbitRadius = 560
+
+zoneOrbitSeconds :: Float
+zoneOrbitSeconds = 52
+
+-- | Di chuyển vùng chiếm quanh tâm bản đồ (một vòng mỗi 52 giây), kể cả lúc còn khoá.
+moveZone :: Maze -> Float -> ZoneState -> ZoneState
+moveZone maze deltaT z
+  | not (bigMap maze) = z
+  | otherwise =
+      let ax = mazeWidth maze / 2
+          ay = mazeHeight maze / 2
+          ang = atan2 (zsCy z - ay) (zsCx z - ax) + 2 * pi * deltaT / zoneOrbitSeconds
+      in z { zsCx = ax + cos ang * zoneOrbitRadius, zsCy = ay + sin ang * zoneOrbitRadius }
 
 -- | Tiến vùng chiếm một tick. Trả về trạng thái mới và (nếu có) đội thắng.
 -- Đội đông xe hơn trong vùng thì tăng tiến trình; hai đội cùng có xe thì tiến

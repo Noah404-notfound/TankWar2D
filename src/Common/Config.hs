@@ -167,7 +167,18 @@ minPlayersToStart = 2
 
 -- | Số người chơi tối đa mỗi phòng.
 maxPlayersPerRoom :: Int
-maxPlayersPerRoom = 4
+maxPlayersPerRoom = 10
+
+-- | Ghép trận Tử chiến (1 đấu 8): tối thiểu 4 người là có thể bắt đầu, tối đa 9 người.
+deathmatchQueueMin :: Int
+deathmatchQueueMin = 4
+
+deathmatchQueueMax :: Int
+deathmatchQueueMax = 9
+
+-- | Sau khi đủ 'deathmatchQueueMin' người, chờ thêm bấy nhiêu giây cho người khác vào rồi mới bắt đầu.
+deathmatchQueueGraceSeconds :: Double
+deathmatchQueueGraceSeconds = 10
 
 -- | Độ dài Room ID tự sinh.
 roomIdLength :: Int

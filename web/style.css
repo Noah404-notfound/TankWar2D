@@ -2456,3 +2456,95 @@ body:not(.in-game):has(.results-screen:not([hidden])) .site-footer {
   .results-actions #results-back { grid-column: 2; }
   .results-actions #results-exit { grid-column: 3; justify-self: end; }
 }
+
+/* ===== Room invite code box ===== */
+.room-screen .room-invite {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 12px 16px 12px 20px;
+  border: 1px solid rgba(199,243,107,.55);
+  background: rgba(8,18,8,.78);
+  box-shadow: inset 0 0 22px rgba(153,207,67,.07);
+}
+.room-screen .room-invite-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.room-screen .room-invite small {
+  color: #9fb292;
+  font: 500 10px/1 'IBM Plex Mono', monospace;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.room-screen .room-invite strong {
+  color: #b6ff3c;
+  font: 800 clamp(34px, 3.2vw, 50px)/1 'Barlow Condensed', sans-serif;
+  letter-spacing: 6px;
+  text-shadow: 0 0 14px rgba(150,255,60,.28);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.room-screen .room-invite .copy-button {
+  flex: 0 0 auto;
+  grid-column: auto; grid-row: auto;
+  width: auto; min-width: 128px; height: 42px;
+  padding: 0 18px;
+  border: 1px solid #8dbb50;
+  background: transparent;
+  color: #dffb8c;
+  font: 700 11px/1 'IBM Plex Mono', monospace;
+  letter-spacing: 1.4px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.room-screen .room-invite .copy-button:hover,
+.room-screen .room-invite .copy-button.copied { background: #c7f36b; color: #172012; }
+@media (max-width: 520px) {
+  .room-screen .room-invite { padding: 10px 12px; gap: 10px; }
+  .room-screen .room-invite strong { font-size: 30px; letter-spacing: 3px; }
+  .room-screen .room-invite .copy-button { min-width: 92px; padding: 0 10px; font-size: 10px; }
+}
+
+/* ===== In-game chat (Y = all, U = team) ===== */
+.chat-log {
+  position: absolute; left: 14px; bottom: 64px; z-index: 28; width: min(46%, 420px);
+  display: flex; flex-direction: column; gap: 3px; pointer-events: none;
+}
+.chat-line {
+  padding: 4px 9px; font: 500 12px/1.35 'IBM Plex Mono', monospace; color: #eef4e8;
+  background: rgba(8,15,9,.72); border-left: 3px solid #e8c96a;
+  word-break: break-word; transition: opacity 1.2s;
+}
+.chat-line.team { border-left-color: #7fd0ff; }
+.chat-line.faded { opacity: 0; }
+.chat-log.open .chat-line.faded { opacity: 1; }
+.chat-line-tag { margin-right: 6px; font: 700 11px 'Barlow Condensed', sans-serif; letter-spacing: 1px; color: #e8c96a; }
+.chat-line.team .chat-line-tag { color: #7fd0ff; }
+.chat-line-name { margin-right: 6px; color: #c7f36b; }
+.chat-line-name.me { color: #fff3b0; }
+.chat-box {
+  position: absolute; left: 14px; bottom: 18px; z-index: 29; width: min(60%, 520px);
+  display: flex; align-items: stretch; margin: 0;
+  background: rgba(8,15,9,.92); border: 1px solid #e8c96a;
+}
+.chat-box.team { border-color: #7fd0ff; }
+.chat-box[hidden] { display: none; }
+.chat-tag {
+  display: flex; align-items: center; padding: 0 12px; background: #e8c96a; color: #1b1405;
+  font: 800 15px/1 'Barlow Condensed', sans-serif; letter-spacing: 1.5px;
+}
+.chat-box.team .chat-tag { background: #7fd0ff; color: #06202e; }
+.chat-input {
+  flex: 1; min-width: 0; padding: 10px 12px; border: 0; outline: 0; background: transparent;
+  color: #f3f8ec; font: 500 13px 'IBM Plex Mono', monospace;
+}
+.chat-input::placeholder { color: #7f917a; }
+
+/* Invite box: label always sits on its own line above the code */
+.room-screen .room-invite-text { display: flex !important; flex-direction: column !important; align-items: flex-start; }
+.room-screen .room-invite-text small { display: block; order: 1; }
+.room-screen .room-invite-text strong { display: block; order: 2; }
+.room-screen .room-invite .room-invite-text { display: flex !important; flex-direction: column !important; align-items: flex-start; gap: 6px; }
+.room-screen .room-invite .room-invite-text small { display: block !important; order: 0; grid-column: auto; }
+.room-screen .room-invite .room-invite-text strong { display: block !important; order: 1; grid-column: auto; }

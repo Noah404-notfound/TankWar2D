@@ -328,8 +328,6 @@
             <h1 id="room-title">PHÒNG CHIẾN ĐẤU</h1>
             <p id="room-caption">Chờ thêm chiến binh.</p>
           </div>
-          <div class="room-code"><small>MÃ PHÒNG</small><strong id="room-code">------</strong><button
-              id="copy-room-code" class="copy-button" type="button" title="Sao chép mã phòng">⧉</button></div>
         </div>
         <div class="room-grid">
           <div class="panel room-players-panel room-asset-panel room-asset-panel-wide">
@@ -339,6 +337,10 @@
               <div><span class="panel-index">01</span>
                 <h2>ĐỘI HÌNH</h2>
               </div><span id="players-counter" class="counter">1 / 4</span>
+            </div>
+            <div class="room-invite">
+              <div class="room-invite-text" style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0"><small style="display:block;font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:1.6px;color:#9fb292">MÃ PHÒNG · GỬI CHO BẠN BÈ</small><strong id="room-code" style="display:block;font:800 44px/1 'Barlow Condensed',sans-serif;letter-spacing:6px;color:#b6ff3c">------</strong></div>
+              <button id="copy-room-code" class="copy-button" type="button" title="Sao chép mã phòng">SAO CHÉP MÃ</button>
             </div>
             <div class="room-mode-line">CHẾ ĐỘ: <strong id="room-mode-label">TỬ CHIẾN</strong></div>
             <div id="room-players" class="player-list"></div>
@@ -414,6 +416,12 @@
               <span id="kda-streak" class="mini-kda-streak" hidden>CHUỖI: 0</span>
             </div>
             <div id="kill-feed" class="kill-feed" aria-live="polite"></div>
+            <div id="chat-log" class="chat-log" aria-live="polite"></div>
+            <form id="chat-box" class="chat-box" hidden autocomplete="off">
+              <span id="chat-tag" class="chat-tag">ALL</span>
+              <input id="chat-input" class="chat-input" type="text" maxlength="120" autocomplete="off" spellcheck="false"
+                placeholder="Nhập tin nhắn rồi nhấn Enter · Esc để hủy">
+            </form>
             <div id="kill-banner" class="kill-banner" hidden aria-live="polite">
               <span class="kill-banner-kicker">ELIMINATION</span>
               <strong id="kill-banner-title">DOUBLE KILL</strong>
